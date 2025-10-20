@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Union, Dict
 from zarr import NestedDirectoryStore, ZipStore
 from json import load as jload
+import argparse
+import logging
 
 Signal = Union[pxm.signals.ElectronDiffraction2D, pxm.signals.LazyDiffraction2D]
 
@@ -44,6 +46,79 @@ class MyPath(Path):  # helpful for appending suffixes to filenames
             return self.with_name(f'{self.stem}{delimiter}{s}.{suffix}')
         else:
             return self.with_stem(f'{self.stem}{delimiter}{s}')
+
+class Error(Exception):
+    pass
+
+class NORTEMError(Error):
+    pass
+
+def set_log_level(logger, level:int=0):
+    log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+    log_level = log_levels[min([level, len(log_levels)-1])]
+    logger.setLevel(log_level)
+
+def args2string(arguments:argparse.Namespace) -> None:
+    """
+    Docstring for print_parser
+    
+    :param parser: Description
+    :type parser: argparse.ArgumentParser
+    """
+
+    parser_description = 'Input parser arguments:'
+    parser_description_header = '*' * len(parser_description)
+    parser_description = parser_description_header + '\n' + parser_description + '\n' + parser_description_header + '\n'
+    parser_description += '\n'.join([f'{arg}: {getattr(arguments, arg)}' for arg in vars(arguments)])
+    return parser_description
+
+def load_metadata_from_json(filename:Union[None, MyPath]) -> Dict:
+    """
+    Load metadata from a json file
+    
+    :param filename: The json file containing the metadata
+    :type filename: MyPath
+    :return: The metadata.
+    :rtype: Dict
+    """
+
+    if filename is None:
+        filename = 'metadata.json'
+    
+    if not filename.suffix == '.json':
+        logger.warning(f'Metadata file name "{filename}" is not a json file. I will change the suffix to .json instead.')
+        filename = filename.with_suffix('.json')
+
+    if not filename.exists():
+        raise NORTEMError(f'Cannot load metadata from "{filename}", the file does not exist.')
+
+    metadata = jload(filename.open('r'))
+    logger.debug(f'Loaded metadata file "{filename}":\n{metadata}')
+    
+    return metadata
+
+def set_metadata(signal, metadata:Dict, metadata_key: str = 'Custom'):
+    """
+    Set experimental parameters and metadata from a json file
+    
+    :param signal: The hyperspy signal to set metadata and experimental parameters for.
+    :param filename: The file containing the metadata to use
+    :type filename: MyPath
+    """
+
+    try:
+        signal.metadata.add_dictionary({metadata_key: metadata})
+        signal.original_metadata.add_dictionary({metadata_key: metadata})
+        logger.info(f'Added custom signal metadata under key "{metadata_key}":\n{signal.metadata.as_dict()[metadata_key]!s}')
+    except Exception as e:
+        raise NORTEMError from e
+    
+    try:
+        experimental_parameters = metadata.get('experimental_parameters', {})
+        logger.debug(f'Setting experimental parameters:\n{experimental_parameters}')
+        signal.set_experimental_parameters(**experimental_parameters)
+    except Exception as e:
+        raise NORTEMError from e
 
 def load(path: MyPath, *args, **kwargs) -> Signal:
     """
