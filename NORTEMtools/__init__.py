@@ -1,7 +1,16 @@
+"""
+NORTEMtools
+
+Code for simplifying data analysis at NORTEM.
+
+To add your own code, see the `/Example` or the repository README.md.
+
+"""
+
 import logging
 
 def make_logger(log_name: str = 'log.txt', formatter=None) -> logging.Logger:
-    __default_fmt__ = '[%(asctime)s - %(levelname)s - %(name)s:%(lineno)s - %(funcName)20s() ]:\n%(message)s\n'
+    __default_fmt__ = '[%(asctime)s - %(levelname)s - %(name)s - %(pathname)s:%(lineno)s - %(funcName)20s() ]:\n%(message)s\n'
 
     f"""Create a logger that logs to both console and a file.
 
@@ -14,9 +23,9 @@ def make_logger(log_name: str = 'log.txt', formatter=None) -> logging.Logger:
     
     """
 
-    logger = logging.getLogger(__file__)
+    logger = logging.getLogger('NORTEM tools logger')
     logger.propagate = False
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     # Set default formatter
     if formatter is None:
@@ -42,7 +51,8 @@ def make_logger(log_name: str = 'log.txt', formatter=None) -> logging.Logger:
 
 logger = make_logger()
 
-from NORTEMtools.utils import MyPath
-from NORTEMtools.NORTEMplates import load_template, save_template
-from NORTEMtools.utils import get_random_coordinates, compute, frame_string, log_shift, pick_random
-from NORTEMtools.NORTEMplates.calibration_check import test_calibration, main
+# Submodule imports
+from . import Emil
+from . import Example
+
+logger.debug(f'Loaded NORTEMtools module')

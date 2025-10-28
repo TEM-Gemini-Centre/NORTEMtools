@@ -1,3 +1,7 @@
+"""
+This module contains utility functions for working with pyxem and hyperspy. It does not add new functionality or analysis tools, but simplifies code by defining commonly and frequently used functions that serve as wrappers around other analysis tools/code. For more information, please read the original documentation of hyperspy and pyxem.
+"""
+
 from NORTEMtools import logger
 import hyperspy.api as hs
 hs.set_log_level('INFO')
@@ -13,6 +17,41 @@ import argparse
 import logging
 
 Signal = Union[pxm.signals.ElectronDiffraction2D, pxm.signals.LazyDiffraction2D]
+
+def log_with_header(header, *messages, logger=logger):
+    """
+    Write to logger on INFO with a framed header.
+
+    Used to write "pretty-ish" information to a logger. This is essentially just a wrapper around the `frame_string()` function and calls to `logger.info()`.
+    
+    :param header: The header to frame before the messages.
+    :param messages: optional positional argument with messages to follow the header.
+    :param logger: The logger to use when logging
+    """
+    header = frame_string(header)
+    if len(messages)>0:
+        message = '\n' + '\n'.join([message for message in messages])
+    else:
+        message=''
+    logger.info(f'{header}{message}')
+
+def dict2string(dictionary: Dict) -> str:
+    """
+    Format a dictionary into a string
+    
+    :param dictionary: Description
+    :type dictionary: Dict
+    :return: Description
+    :rtype: str
+    """
+
+    string = ''
+    for key in dictionary:
+        value = dictionary[key]
+        if isinstance(value, dict):
+            value = dict2string(value).replace('\n\t', '\n\t\t', count=1) #add a new tab for each level
+        string += f'\n\t{key}: {value}'
+    return string
 
 class MyPath(Path):  # helpful for appending suffixes to filenames
     """
@@ -47,12 +86,6 @@ class MyPath(Path):  # helpful for appending suffixes to filenames
         else:
             return self.with_stem(f'{self.stem}{delimiter}{s}')
 
-class Error(Exception):
-    pass
-
-class NORTEMError(Error):
-    pass
-
 def set_log_level(logger, level:int=0):
     log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
     log_level = log_levels[min([level, len(log_levels)-1])]
@@ -86,16 +119,30 @@ def load_metadata_from_json(filename:Union[None, MyPath]) -> Dict:
         filename = 'metadata.json'
     
     if not filename.suffix == '.json':
-        logger.warning(f'Metadata file name "{filename}" is not a json file. I will change the suffix to .json instead.')
+        logger.warning(f'Metadata file name "{filename}" is not a json file. I will change the suffix to .json instead before attempting to load.')
         filename = filename.with_suffix('.json')
-
-    if not filename.exists():
-        raise NORTEMError(f'Cannot load metadata from "{filename}", the file does not exist.')
 
     metadata = jload(filename.open('r'))
     logger.debug(f'Loaded metadata file "{filename}":\n{metadata}')
     
     return metadata
+
+def metadata2json(filename:Union[None, MyPath], metadata:Dict):
+    """
+    Docstring for metadata2json
+    
+    :param filename: Description
+    :type filename: Union[None, MyPath]
+    :param metadata: Description
+    :type metadata: Dict
+    """
+    if filename is None:
+        filename = MyPath('metadata.json')
+    filename = MyPath(filename)
+
+    log_with_header('Writing metadata to json file', f'File path: "{filename}"', f'Metadata: {dict2string(metadata)}')
+
+    logger.debug(f'Writing metadata file to "{filename}"')
 
 def set_metadata(signal, metadata:Dict, metadata_key: str = 'Custom'):
     """
@@ -106,20 +153,44 @@ def set_metadata(signal, metadata:Dict, metadata_key: str = 'Custom'):
     :type filename: MyPath
     """
 
-    try:
-        signal.metadata.add_dictionary({metadata_key: metadata})
-        signal.original_metadata.add_dictionary({metadata_key: metadata})
-        logger.info(f'Added custom signal metadata under key "{metadata_key}":\n{signal.metadata.as_dict()[metadata_key]!s}')
-    except Exception as e:
-        raise NORTEMError from e
+    debug_string = '\n\t'.join([f'{key}={metadata[key]}' for key in metadata])
     
-    try:
-        experimental_parameters = metadata.get('experimental_parameters', {})
-        logger.debug(f'Setting experimental parameters:\n{experimental_parameters}')
-        signal.set_experimental_parameters(**experimental_parameters)
-    except Exception as e:
-        raise NORTEMError from e
+    logger.debug(f'Setting metadata of signal {signal} under the {metadata_key} key:\n\t{debug_string}')
 
+    logger.debug(f'Signal metadata before:\n{signal.metadata}')
+    signal.metadata.add_dictionary({metadata_key: metadata})
+    logger.debug(f'Signal metadata after:\n{signal.metadata}')
+
+    logger.debug(f'Signal original metadata before:\n{signal.original_metadata}')
+    signal.original_metadata.add_dictionary({metadata_key: metadata})
+    logger.debug(f'Signal original metadata after:\n{signal.original_metadata}')
+
+    logger.info(f'Added custom signal metadata under key "{metadata_key}":\n{signal.metadata.as_dict()[metadata_key]!s}')
+    
+def set_experimental_parameters(signal, parameters:Dict) -> None:
+    """
+    Docstring for set_experimental_parameters
+    
+    :param signal: Description
+    :param parameters: Description
+    :type parameters: Dict
+    """
+    logger.info(frame_string('Setting experimental parameters'))
+
+    #Log some infor for debugging
+    debug_string = '\n\t'.join([f'{key}={parameters[key]}' for key in parameters])
+    logger.debug(f'Got parameters for setting experimental parameters:\n\t{debug_string}')
+
+    #Set one experimental parameter at a time.
+    for key in parameters:
+        try:
+            logger.debug(f'Setting experimental parameter {key}={parameters[key]}')
+            signal.set_experimental_parameters(**{key: parameters[key]}) #Set one experimental parameter
+            logger.info(f'Set experimental parameter of signal: {key}={parameters[key]}')
+        except Exception as e:
+            logger.warning(f'Could not set experimental parameter {key}={parameters[key]} due to error: {e}. Ignoring and continuing, but you might want to double check this.')
+    logger.debug(f'Finished setting experimental parameters.')
+    
 def load(path: MyPath, *args, **kwargs) -> Signal:
     """
     Docstring for load
@@ -129,8 +200,8 @@ def load(path: MyPath, *args, **kwargs) -> Signal:
     :return: Description
     :rtype: Signal
     """
-
-    logger.info(f'Loading data from "{path}"')
+    path = MyPath(path)
+    log_with_header('Loading data', f'Loading data from "{path}"')
     if path.suffix.lower() == '.zspy':
         try:
             logger.debug('Detected .zspy file; loading using NestedDirectoryStore.')
@@ -144,10 +215,7 @@ def load(path: MyPath, *args, **kwargs) -> Signal:
         logger.debug('Loading data')
         signal = hs.load(str(path), *args, **kwargs)
 
-    logger.info(f'Loaded data: {signal}\n'\
-                f'Data loaded with shape {signal.data.shape} and type {type(signal)}\n'\
-                f'Current signal axes:\n{signal.axes_manager}'
-                )
+    log_with_header('Loaded data', f'{signal}', f'Shape {signal.data.shape} and type {type(signal)}', f'Current signal axes:\n{signal.axes_manager}')
     
     logger.debug(f'Current metadata:\n{signal.metadata.as_dictionary()!s}')
     
@@ -446,6 +514,162 @@ def set_calibrations(signal: Signal, x: Union[None, float], y: Union[None, float
         logger.warn('No scan calibrations provided!')
     else:
         if x is None:
+            logger.wawarning(f'No scan calibration in x-axis provided, using calibration for y-axis = {x}')
+            x = y
+        elif y is None:
+            logger.warning(f'No scan calibration in y-axis provided, using calibration for x-axis = {y}')
+            y = x
+        logger.info(f'Setting scan step size calibrations:\n\tx={x}\n\ty={y}')
+        signal.set_scan_calibration(x)
+        signal.axes_manager['y'].scale = y
+
+    if kx is None and ky is None:
+        logger.warn('No diffraction calibrations provided!')
+    else:
+        if kx is None:
+            logger.warning(f'No diffraction calibration in x-axis provided, using calibration for y-axis = {ky}')
+            kx = ky
+        elif ky is None:
+            logger.warning(f'No diffraction calibration in y-axis provided, using calibration for x-axis = {kx}')
+            ky = kx
+        logger.info(f'Setting diffraction calibrations:\n\tkx={kx}\n\tky={ky}')
+        signal.set_diffraction_calibration(kx)
+        signal.axes_manager['ky'].scale =ky
+
+    logger.info(f'Calibrated axes manager:\n{signal.axes_manager}')
+
+def make_navigation_mask(signal: Signal, width: Union[None, int] = None) -> hs.signals.Signal2D:
+    """
+    Make a navigation mask frame
+
+    :param signal: The signal to make a mask for
+    :param width: the width of the mask frame
+    :returns: navigation mask
+
+    :type signal: Signal
+    :type width: Union[None, int]
+    :rtype: hs.signals.Signal2D
+    """
+    navigation_mask = hs.signals.Signal2D(np.zeros(signal.axes_manager.navigation_shape, dtype=bool).T).T
+    navigation_mask.metadata.General.title = 'Navigation mask'
+    if width is None:
+        width = 0
+    logger.debug(f'Making navigation mask with a frame width of {width} pixels set to True')
+    navigation_mask.inav[width:-width, width:-width] = True    
+    return navigation_mask
+    
+def center_direct_beam(signal: Signal, com_mask: Union[None, tuple] = None, estimate_linear_shift: bool = False, plot_results: bool = False, estimate_linear_shifts_kwargs: Union[None, Dict] = None, **kwargs) -> pxm.signals.ElectronDiffraction2D:
+    """
+    Center the direct beam of a signal
+
+    :param signal: The signal to center the direct beam for
+    :param com_mask: The region of the diffraction patterns to calculate COM within
+    :param estimate_linear_shift: Whether to estimate linear shifts or not
+    :param plot_results: Whether to plot the results or not
+    :param estimate_linear_shifts_kwargs: Keyword arguments passed to linear shift estimation
+    :kwargs: Optional keyword arguments passed to signal.center_direct_beam.
+    :returns: Centered. The centered signal.
+
+    :type signal: Signal
+    :type com_mask: Union[None, tuple]
+    :type estimate_linear_shift: bool
+    :type plot_results: bool
+    :type estimate_linear_shift_kwargs: Dict
+    :rtype: Signal
+    """
+
+
+    kwargs['inplace'] = kwargs.get('inplace', False) #Set default inplace to False
+    _ = kwargs.pop('method', None) #Remove any `method` as it is not compatible with the shifts we will specify later on.
+
+    logger.debug(f'Calculating maximum through-stack before centering')
+    max_before = signal.max(axis=[0, 1])
+    max_before.metadata.General.title = 'Before'
+    try:
+        max_before.compute()
+    except Exception:
+        pass
+
+    centering_metadata = {} #Metadata dict for centering parameters
+
+    if 'shifts' not in kwargs:
+        logger.debug('No shifts provided to centering algorithm. Will calculate shifts using `center_of_mass`')
+        if com_mask is None:
+            nx, ny = signal.axes_manager.signal_size
+            cx, cy = nx//2, ny//2
+            com_mask = (cx, cy, 15)
+            logger.debug(f'No mask for COM analysis provided, using default {com_mask}')
+
+        logger.debug(f'Finding direct beam position through COM analysis within {com_mask}')
+        centering_metadata['COM_mask'] = com_mask
+
+        shifts = signal.get_direct_beam_position(method='center_of_mass', mask=com_mask)
+        try:
+            shifts.compute()
+        except Exception:
+            pass
+        kwargs['shifts'] = shifts
+        logger.debug(f'Found direct beam positions {shifts}')
+
+    if estimate_linear_shift:
+        logger.debug(f'Estimating linear shifts with input: {estimate_linear_shifts_kwargs}')
+        linear_shift = kwargs['shifts'].get_linear_plane(**estimate_linear_shifts_kwargs)
+        kwargs['shifts'] = linear_shift
+        logger.debug(f'Estimated linear shifts: {linear_shift}')
+        centering_metadata['estimate_linear_shift'] = estimate_linear_shifts_kwargs
+
+    centering_metadata['Shifts'] = kwargs['shifts']
+    logger.debug(f'Centering direct beam using arguments: {kwargs}')
+    centered = signal.center_direct_beam(**kwargs)
+    logger.debug(f'Finished centering direct beam')
+
+    logger.debug(f'Calculating maximum through-stack after centering')
+    max_after = centered.max(axis=[0, 1])
+    max_after.metadata.General.title = 'After'
+
+    try:
+        max_after.compute()
+    except Exception:
+        pass
+        
+    centering_metadata['Max_before'] = max_before
+    centering_metadata['Max_after'] = max_after
+
+    #Add centering metadata to signal metadata.
+    centered.metadata.add_dictionary({
+        'Preprocessing': {
+            'Centering': centering_metadata
+        }
+    })
+
+    if plot_results:
+        hs.plot.plot_images([max_before, max_after], overlay=True, alphas=[1, 0.75], colors=['w', 'r'])
+    
+    logger.debug(f"Finished centering direct beam. Centering metadata:\n{centered.metadata.Preprocessing.Centering}")
+
+    return centered
+
+def set_calibrations(signal: Signal, x: Union[None, float], y: Union[None, float], kx:Union[None, float], ky:Union[None, float]) -> None:
+    """
+    Sets the calibration of provided signal
+
+    :param signal: The signal to calibrate
+    :param x: x-axis scan step size calibration
+    :param y: y-axis scan step size calibration
+    :param kx: x-axis diffraction calibration
+    :param ky: y-axis diffraction calibration
+    :returns: None
+
+    :type x: Union[None, float]
+    :type y: Union[None, float]
+    :type kx: Union[None, float]
+    :type ky: Union[None, float]
+    :rtype: None
+    """
+    if x is None and y is None:
+        logger.warn('No scan calibrations provided!')
+    else:
+        if x is None:
             logger.warn(f'No scan calibration in x-axis provided, using calibration for y-axis = {x}')
             x = y
         elif y is None:
@@ -470,117 +694,26 @@ def set_calibrations(signal: Signal, x: Union[None, float], y: Union[None, float
 
     logger.info(f'Calibrated axes manager:\n{signal.axes_manager}')
 
-def preprocess(filename: Union[str, Path],
-            lazy: bool = True, 
-            com_mask: tuple = (128, 128, 12), 
-            estimate_linear_shift: bool = False, 
-            width: int = 20, 
-            calibrations: Dict={},
-            nav_chunks: int = 32,
-            sig_chunks: int = 32):
-    """
-    Preprocess a 4D STEM data file
-
-    :param filename: The path to the data file.
-    :param lazy: Whether to work lazily. Default is True
-    :param com_mask: The region of the diffraction pattern to calculate COM within given in pixel coordinates (x, y, r). Default is (128, 128, 12)
-    :param estimate_linear_shift: Whether to estimate the linear shift based on COM results or not. Default is False
-    :param calibrations: The calibrations of the data as a dictionary `{"x": x, "y": y, "kx": kx, "ky": ky}`. Default is empty (no calibration performed)
-    :param width: The width of the navigation frame to use when estimating the linear descan shift. Default is False
-    :param nav_chunks: The chunking to use in the navigation dimension
-    :param sig_chunks: The chunking to use in the signal dimension
-    
-    :type filename: Union[str, Path]
-    :type lazy: bool
-    :type com_mask: Union[None, tuple]
-    :type estimate_linear_shift: bool
-    :type calibrations: Dict
-    :type width: int
-    :type nav_chunks: int
-    :type sig_chunks: int
-    
-    :return: preprocessed_signal
-    :rtype: Signal
-    """
-    filename=Path(filename)
-
-    logger.debug(
-        f'Preprocessing function got the following arguments:'\
-        f'\n\tfilename: {filename!r}'\
-        f'\n\tlazy: {lazy!r}'\
-        f'\n\tcom_mask: {com_mask!r}'\
-        f'\n\testimate_linear_shift: {estimate_linear_shift!r}'
-        f'\n\twidth: {width!r}'\
-        f'\n\tcalibrations: {calibrations!r}'\
-        f'\n\tnav_chunks: {nav_chunks!r}'\
-        f'\n\tsig_chunks: {sig_chunks!r}'
-        )
-
-    filename = Path(filename)
-    logger.info(f'Loading data from "{filename}"')
-
-    # Load data
-    if filename.suffix == '.zspy':
-        logger.debug('Loading data lazily with zarr ZipStore')
-        try:
-            store = ZipStore(filename)
-            signal = hs.load(store, lazy=lazy)
-        except Exception as e:
-            logger.error(f'Exception when loading zspy file with ZipStore: {e}. Trying NestedDirectoryStore instead.')
-            store = NestedDirectoryStore(filename)
-            signal = hs.load(store, lazy=lazy)
-    else:
-        logger.debug(f'Loading data')
-        signal = hs.load(filename, lazy=lazy)
-    logger.debug(f'Loaded data')
-    if not isinstance(signal, pxm.signals.ElectronDiffraction2D):
-        logger.warning(
-            f'Only ElectronDiffraction2D signals can be preprocessed. I got {signal!r} of type {type(signal)}')
-    
-    if isinstance(signal, pxm.signals.LazyElectronDiffraction2D):
-        logger.debug(f'Rechunking data with `nav_chunks={nav_chunks}`, `sig_chunks={sig_chunks}`')
-        signal.rechunk(nav_chunks=nav_chunks, sig_chunks=sig_chunks)
-
-    # Center data
-    logger.info('Centering dataset')
-    estimate_linear_shift_kwargs = {}
-    if estimate_linear_shift:
-        estimate_linear_shift_kwargs['mask'] = make_navigation_mask(signal, width)
-
-    signal = center_direct_beam(signal, com_mask=com_mask, estimate_linear_shift=estimate_linear_shift, plot_results=False, estimate_linear_shifts_kwargs=estimate_linear_shift_kwargs)
-
-    # Add metadata
-    metadata_dict = jload(filename.with_name("metadata.json").open('r'))
-    logger.debug(f'Loaded metadata file "{filename.with_name("metadata.json")}":\n{metadata_dict}')
-    
-    experimental_parameters = metadata_dict.get('experimental_parameters', {})
-    logger.debug(f'Setting experimental parameters:\n{experimental_parameters}')
-    signal.set_experimental_parameters(**experimental_parameters)
-
-    signal.metadata.add_dictionary({'Custom': metadata_dict})
-    signal.original_metadata.add_dictionary({'Custom': metadata_dict})
-    logger.info(f'Signal metadata:\n{signal.metadata!s}')
-
-    # Set calibration
-    x, y, kx, ky = [calibrations.get(f'{ax}', metadata_dict.get('axes', {}).get(f'{ax}', {}).get('scale', None)) for ax in ["x", "y", "kx", "ky"]]
-    set_calibrations(signal, x, y, kx, ky)
-
-    # Make VBF and maximum through-stack
-    logger.info(f'Preparing VBF')
-    vbf = signal.get_integrated_intensity(hs.roi.CircleROI(cx=0., cy=0., r_inner=0., r=0.07))
-    signal.metadata.add_dictionary({
-        'Preprocessing': {'VBF': vbf}
-    })
-
-    logger.info('Preparing maximum through-stack')
-    maximums = signal.max(axis=[0, 1])
-    signal.metadata.add_dictionary({
-        'Preprocessing': {'Maximums': maximums}
-    })
-
-    # Save the VBF and maximums
-    logger.info(f'Saving VBF and maximums as images')
-    plt.imsave(filename.with_name(f'{filename.stem}_preprocessed_vbf.png'), vbf.data)
-    plt.imsave(filename.with_name(f'{filename.stem}_preprocessed_maximums.png'), maximums.data)
-
-    return signal
+__all__ = [
+    "Signal",
+    "MyPath",
+    "set_log_level",
+    "args2string",
+    "load_metadata_from_json",
+    "set_metadata",
+    "set_experimental_parameters",
+    "load",
+    "frame_string",
+    "compute",
+    "log_shift",
+    "get_random_coordinates",
+    "pick_random",
+    "make_navigation_mask",
+    "center_direct_beam",
+    "set_calibrations",
+    "make_navigation_mask",
+    "center_direct_beam",
+    "set_calibrations",
+    "logger",
+    "log_with_header"
+]

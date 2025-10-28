@@ -1,6 +1,7 @@
 from NORTEMtools import logger
-from NORTEMtools.utils import MyPath, compute, frame_string, log_shift, pick_random, Signal, load
-from NORTEMtools.NORTEMplates import load_template, result2DataFrame, summarize_results
+from NORTEMtools.Emil.utils import MyPath, compute, frame_string, log_shift, pick_random, Signal, load
+from NORTEMtools.Emil.templatematching.io import load_template
+from NORTEMtools.Emil.templatematching.postprocessing import result2DataFrame, summarize_results
 
 import numpy as np
 from typing import Union, Callable

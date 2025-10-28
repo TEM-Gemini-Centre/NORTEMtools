@@ -1,8 +1,15 @@
+"""
+This script can be used to preprocess datasets using commonly and frequently used steps. Please see the help call of `main()` for more information on how to use this script (see the example below).
+
+```bash
+python NORTEMtools/scripts/preprocess.py --help
+```
+"""
+
 import argparse
-import logging
 from zarr import ZipStore
 from NORTEMtools import logger
-from NORTEMtools.utils import MyPath, args2string, set_log_level, preprocess, load,load_metadata_from_json,set_calibrations, set_metadata, center_direct_beam, make_navigation_mask, NORTEMError, compute
+from NORTEMtools.Emil.utils import MyPath, args2string, set_log_level, load, load_metadata_from_json,set_calibrations, set_metadata, center_direct_beam, make_navigation_mask, compute, set_experimental_parameters
 from typing import Union, Dict
 import matplotlib.pyplot as plt
 import pyxem as pxm
@@ -70,11 +77,12 @@ def preprocess(filename: Union[str, MyPath],
     # Add metadata
     try:
         metadata = load_metadata_from_json(metadata_file)
-    except NORTEMError as e:
+    except Exception as e:
         logger.warning(f'Could not load metadata from json file due to error: {e}')
         metadata = {}
     else:
         set_metadata(signal, metadata)
+        set_experimental_parameters(signal, metadata.get('experimental_parameters'))
     
     # Set calibration
     x, y, kx, ky = [calibrations.get(f'{ax}', metadata.get('axes', {}).get(f'{ax}', {}).get('scale', None)) for ax in ["x", "y", "kx", "ky"]]
