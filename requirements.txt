@@ -1,0 +1,7 @@
+pyxem==0.21.0
+pandas
+json
+seaborn
+matplotlib
+ruff
+black
