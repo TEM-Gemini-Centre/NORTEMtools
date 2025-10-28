@@ -6,5 +6,6 @@ This file contains the code your submodule. You can import other stuff NORTEMtoo
 
 from NORTEMtools import logger
 
+
 def foo():
-    logger.info('foo') #Log the string "foo".
+    logger.info("foo")  # Log the string "foo".
