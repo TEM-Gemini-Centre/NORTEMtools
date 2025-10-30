@@ -68,7 +68,7 @@ def result2DataFrame(
 def summarize_results(
     results: pd.DataFrame,
     output_path: MyPath,
-    groupby_column: str = "Position",
+    groupby_column: str = "Pixels",
     title: str = "",
 ) -> pd.DataFrame:
     """
@@ -94,6 +94,7 @@ def summarize_results(
 
     best_rows = group["Correlation"].idxmax()
     best_calibrations = results.loc[best_rows]
+    best_calibrations.sort_values("Correlation", inplace=True)
 
     # Print best calibrations
     logger.info(
@@ -124,22 +125,60 @@ def summarize_results(
     logger.debug("Generating summary plot...")
     plt.figure()
     x = np.arange(len(best_calibrations_array))
-    sb.set_style("whitegrid")
+    sb.set_style("ticks")
     mean = np.full_like(best_calibrations_array, best_calibrations_array.mean())
     median = np.full_like(best_calibrations_array, np.median(best_calibrations_array))
-    max = np.full_like(best_calibrations_array, best_calibrations_array.max())
-    min = np.full_like(best_calibrations_array, best_calibrations_array.min())
+    max_val = np.full_like(best_calibrations_array, best_calibrations_array.max())
+    min_val = np.full_like(best_calibrations_array, best_calibrations_array.min())
 
-    ax = sb.scatterplot(x=x, y=best_calibrations_array, marker="x")
-    sb.lineplot(x=x, y=best_calibrations_array)
-    sb.lineplot(x=x, y=mean, label="Mean", linestyle="--")
-    sb.lineplot(x=x, y=median, label="Median", linestyle="--")
-    sb.lineplot(x=x, y=max, label="Max", linestyle="--")
-    sb.lineplot(x=x, y=min, label="Min", linestyle="--")
+    ax = sb.scatterplot(
+        data=best_calibrations, x=groupby_column, y="Calibration", marker="x"
+    )
+    sb.lineplot(data=best_calibrations, x=groupby_column, y="Calibration")
+    line = ax.lines[0]
+    line_color = line.get_color()
+    ax.yaxis.label.set_color(line_color)
+    sb.lineplot(
+        data=best_calibrations, x=groupby_column, y=mean, label="Mean", linestyle="--"
+    )
+    sb.lineplot(
+        data=best_calibrations,
+        x=groupby_column,
+        y=median,
+        label="Median",
+        linestyle="--",
+    )
+    sb.lineplot(
+        data=best_calibrations, x=groupby_column, y=max_val, label="Max", linestyle="--"
+    )
+    sb.lineplot(
+        data=best_calibrations, x=groupby_column, y=min_val, label="Min", linestyle="--"
+    )
 
-    ax.set_xlabel("Position number")
+    twinax = ax.twinx()
+    twin_color = "r"
+    sb.scatterplot(
+        data=best_calibrations,
+        x=groupby_column,
+        y="Correlation",
+        marker="x",
+        color=twin_color,
+        ax=twinax,
+    )
+    sb.lineplot(
+        data=best_calibrations,
+        x=groupby_column,
+        y="Correlation",
+        color=twin_color,
+        ax=twinax,
+    )
+    twinax.yaxis.label.set_color(twin_color)
+
+    ax.set_xlabel(f"{groupby_column}")
     ax.set_ylabel("Best Calibration")
-    _ = ax.set_xticks(x, labels=best_calibrations.index, rotation=45, ha="right")
+    _ = ax.set_xticks(
+        x, labels=best_calibrations[groupby_column], rotation=45, ha="right"
+    )
     plt.title(title)
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
