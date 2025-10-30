@@ -224,7 +224,7 @@ def main():
         output_dir_name = f"{input_path.stem}"
     else:
         output_dir_name = f"{args.name}"
-    output_dir_name = f'{dt.now().strftime("%Y%m%d_%H%M%S")}_{output_dir_name}'
+    output_dir_name = f'{dt.datetime.now().strftime("%Y%m%d_%H%M%S")}_{output_dir_name}'
     output_dir = MyPath(args.output_dir) / output_dir_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
