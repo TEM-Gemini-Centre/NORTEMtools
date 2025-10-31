@@ -54,9 +54,11 @@ def result2DataFrame(
                 },
                 index=[0],
             )
-
+            df["Location"] = (
+                i * result.axes_manager[0].size + j * result.axes_manager[1].size
+            )
+            df["Position"] = f"({i}, {j})"
             if coords is not None:
-                df["Position"] = (f"({i}, {j})",)
                 df["Pixels"] = f"({int(xs[i, j])}, {int(ys[i, j])})"
 
             results = pd.concat([results, df], ignore_index=True)
@@ -68,7 +70,7 @@ def result2DataFrame(
 def summarize_results(
     results: pd.DataFrame,
     output_path: MyPath,
-    groupby_column: str = "Position",
+    groupby_column: str = "Location",
     title: str = "",
 ) -> pd.DataFrame:
     """
