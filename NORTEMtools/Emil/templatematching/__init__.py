@@ -136,5 +136,5 @@ __all__ = [
     "save_template",
     "result2DataFrame",
     "summarize_results",
-    MyBank,
+    "MyBank",
 ]
