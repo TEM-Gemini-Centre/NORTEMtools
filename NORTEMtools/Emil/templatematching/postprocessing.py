@@ -94,7 +94,17 @@ def summarize_results(
 
     best_rows = group["Correlation"].idxmax()
     best_calibrations = results.loc[best_rows]
+
+    # Save best calibrations
+    csv_path = output_path.with_name("best_calibrations.csv")
+    with open(csv_path, "w", encoding="utf-8") as f:
+        best_calibrations.to_csv(f, index=False)
+
     best_calibrations.sort_values("Correlation", inplace=True)
+    # Save best calibrations (sorted)
+    csv_path = output_path.with_name("best_calibrations_sorted.csv")
+    with open(csv_path, "w", encoding="utf-8") as f:
+        best_calibrations.to_csv(f, index=False)
 
     # Print best calibrations
     logger.info(
