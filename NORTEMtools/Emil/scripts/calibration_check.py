@@ -8,6 +8,7 @@ from NORTEMtools.Emil.utils import (
     pick_random,
     Signal,
     load,
+    set_log_level,
 )
 from NORTEMtools.Emil.templatematching.io import load_template
 from NORTEMtools.Emil.templatematching.postprocessing import (
@@ -218,6 +219,7 @@ def main():
         help="Name for the output files. Output files are timestamped. If not provided, the name of the input file is used.",
     )
     args = parser.parse_args()
+    set_log_level(logger, args.verbosity)
 
     # Get the input path of the data file. Log files will be saved in the same directory.
     input_path = MyPath(args.input_file)
