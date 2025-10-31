@@ -411,9 +411,18 @@ def pick_random(
 
         plt.figure()
         plt.imshow(vbf.data, cmap="gray")
+        ax = plt.gca()
         for i, c in zip(np.arange(len(coords)), coords):
-            plt.scatter(c[0], c[1], color="red", marker="*")
-            plt.text(c[0] - 3, c[1] - 5, s=str(i), color="red")
+            ax.scatter(
+                c[0], c[1], color="red", marker="*", label=f"{i}: ({c[0]},{c[1]})"
+            )
+            ax.text(c[0] - 3, c[1] - 5, s=f"{i}", color="red")
+        ax.legend(
+            fontsize="x-small",
+            bbox_to_anchor=(1.05, 1),
+            loc="upper left",
+            borderaxespad=0.0,
+        )
         plt.tight_layout()
         plt.axis("off")
         try:
