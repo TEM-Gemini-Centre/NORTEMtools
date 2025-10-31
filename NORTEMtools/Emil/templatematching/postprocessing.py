@@ -68,7 +68,7 @@ def result2DataFrame(
 def summarize_results(
     results: pd.DataFrame,
     output_path: MyPath,
-    groupby_column: str = "Pixels",
+    groupby_column: str = "Position",
     title: str = "",
 ) -> pd.DataFrame:
     """
