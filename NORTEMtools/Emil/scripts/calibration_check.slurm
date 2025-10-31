@@ -34,7 +34,7 @@ pythonpath='/cluster/projects/itea_lille-nv-fys-tem/miniforge3/envs/pyxem0.21.0/
 pythonscriptpath='./calibration_check.py'
 
 #Run Script
-${pythonpath} ${pythonscriptpath} ${datafilepath} -v -n ${n} --start ${start} --end ${end} --n_random ${n_random} --guess ${GUESS[$SLURM_ARRAY_TASK_ID]} --name ${NAME[$SLURM_ARRAY_TASK_ID]} --template_file ${templatepath}
+${pythonpath} ${pythonscriptpath} ${datafilepath} -vvv -n ${n} --start ${start} --end ${end} --n_random ${n_random} --guess ${GUESS[$SLURM_ARRAY_TASK_ID]} --name ${NAME[$SLURM_ARRAY_TASK_ID]} --template_file ${templatepath}
 
 # Display job details
 scontrol show job ${SLURM_JOB_ID} -d
