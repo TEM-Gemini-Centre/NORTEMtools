@@ -1,4 +1,4 @@
-from NORTEMtools import logger, add_log_hander, remove_log_handler
+from NORTEMtools import logger, add_log_handler, remove_log_handler
 
 from NORTEMtools.Emil.utils import (
     MyPath,
@@ -233,7 +233,7 @@ def main():
     else:
         output_dir = MyPath(args.output_dir) / output_dir_name
     output_dir.mkdir(parents=True, exist_ok=True)
-    add_log_hander(output_dir / "log.txt")
+    add_log_handler(output_dir / "log.txt")
 
     # Print parser description and arguments to log
     parser_description = "Calibration check script arguments:"
