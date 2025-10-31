@@ -40,6 +40,7 @@ def result2DataFrame(
         logger.debug(f"Using coordinates from metadata: {coords!s}")
         xs = np.array(coords)[:, 0].reshape(signal.axes_manager.navigation_shape)
         ys = np.array(coords)[:, 1].reshape(signal.axes_manager.navigation_shape)
+        logger.debug(f"xs={xs}\nys={ys}")
 
     results = pd.DataFrame()
     for i in range(result.axes_manager[0].size):
@@ -54,7 +55,7 @@ def result2DataFrame(
                 },
                 index=[0],
             )
-            location = i * result.axes_manager[0].size + j
+            location = i * result.axes_manager[1].size + j
             position = f"({i}, {j})"
             pixels = (
                 (f"({int(xs[i, j])}, {int(ys[i, j])})") if coords is not None else None
