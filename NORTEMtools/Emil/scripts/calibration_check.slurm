@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=CPUQ
 #SBATCH --cpus-per-task=5
-#SBATCH --time=0-03:00:00
+#SBATCH --time=0-00:20:00
 #SBATCH --job-name="CalCheck"
 #SBATCH --mem=64000
 #SBATCH --mail-type=END,FAIL,START
@@ -17,7 +17,7 @@ module purge
 
 # Parameters 
 n_random=10 #Number of sampling points to pick from data
-n=50 #The number of calibrations to test
+n=5 #The number of calibrations to test
 start=0.6 #The relative calibration value to start with
 end=1.2 #The relative 
 GUESS=(0.0127931 0.0106398 0.00918478 0.00756774 0.00593451) #Tabulated calibration values for 8, 10, 12, 15, 20 cm camera lengths
