@@ -42,7 +42,7 @@ def make_logger(log_file: str = "log.txt", formatter=None) -> logging.Logger:
     logger.addHandler(ch)
 
     # Add file handler
-    fh = logging.FileHandler(log_file, "w", encoding="utf-8")
+    fh = logging.FileHandler(log_file, "a+", encoding="utf-8")
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
     logger.addHandler(fh)
@@ -63,7 +63,7 @@ def add_log_handler(logfile: str, logger: logging.Logger = logger):
     :type logger: logging.Logger
     """
 
-    fh = logging.FileHandler(logfile, "w", encoding="utf-8")
+    fh = logging.FileHandler(logfile, "a+", encoding="utf-8")
     fh.setLevel(logger.level)
     for handler in logger.handlers:
         if isinstance(handler, logging.FileHandler):
