@@ -1,4 +1,6 @@
-from NORTEMtools import logger
+from NORTEMtools import logger as NORTEMlogger
+from NORTEMtools import make_logger
+
 from NORTEMtools.Emil.utils import (
     MyPath,
     compute,
@@ -160,8 +162,8 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="calibration_output",
-        help="Directory to save output results",
+        default=None,
+        help='Directory to save output results. Default is None, which will put outputs in a subfolder "calibration_check" at the same location as input data',
     )
     parser.add_argument(
         "--n_random",
@@ -225,8 +227,19 @@ def main():
     else:
         output_dir_name = f"{args.name}"
     output_dir_name = f'{dt.datetime.now().strftime("%Y%m%d_%H%M%S")}_{output_dir_name}'
-    output_dir = MyPath(args.output_dir) / output_dir_name
+    if args.output_dir is None:
+        output_dir = (
+            input_path.absolute().parent / "calibration_check" / output_dir_name
+        )
+    else:
+        output_dir = MyPath(args.output_dir) / output_dir_name
     output_dir.mkdir(parents=True, exist_ok=True)
+    logger = make_logger(
+        output_dir / "log.txt"
+    )  # Create a separate logger for this script
+    [
+        NORTEMlogger.addHandler(handler) for handler in logger.handlers
+    ]  # Add the handlers of this logger to the NORTEMlogger.
 
     # Print parser description and arguments to log
     parser_description = "Calibration check script arguments:"
