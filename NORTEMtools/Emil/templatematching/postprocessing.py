@@ -54,16 +54,19 @@ def result2DataFrame(
                 },
                 index=[0],
             )
-            location = i * result.axes_manager[0].size + j * result.axes_manager[1].size
+            location = i * result.axes_manager[0].size + j
             position = f"({i}, {j})"
-            pixels = df["Pixels"] = (
-                f"({int(xs[i, j])}, {int(ys[i, j])})" if coords is not None else None
+            pixels = (
+                (f"({int(xs[i, j])}, {int(ys[i, j])})") if coords is not None else None
             )
+            df["Location"] = location
+            df["Position"] = position
+            df["Pixels"] = pixels
+
+            results = pd.concat([results, df], ignore_index=True)
             logger.debug(
                 f"Dataframe for location {location} = {position} (pixels {pixels}):\n{str(df)}"
             )
-
-            results = pd.concat([results, df], ignore_index=True)
 
     logger.debug(f"Result DataFrame:\n{results.to_string()}")
     return results
