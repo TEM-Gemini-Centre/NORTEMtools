@@ -5,6 +5,7 @@
 #SBATCH --job-name="CalCheck"
 #SBATCH --mem=64000
 #SBATCH --mail-type=END,FAIL,START
+#SBATCH --mail-user=emil.christiansen@ntnu.no
 #SBATCH --array=0-4
 echo "This is job $SLURM_JOB_ID with name $SLURM_JOB_NAME submitted from $SLURM_SUBMIT_DIR"
 echo "This job was run on $SLURM_JOB_NUM_NODES nodes using $SLURM_CPUS_ON_NODE cores per node with a total of $SLURM_NTASKS cores on these nodes: $SLURM_JOB_NODELIST"
