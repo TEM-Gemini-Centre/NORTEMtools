@@ -8,6 +8,7 @@ To add your own code, see the `/Example` or the repository README.md.
 """
 
 import logging
+from pathlib import Path
 
 
 def make_logger(log_file: str = "log.txt", formatter=None) -> logging.Logger:
@@ -50,6 +51,46 @@ def make_logger(log_file: str = "log.txt", formatter=None) -> logging.Logger:
 
 
 logger = make_logger()
+
+
+def add_log_handler(logfile: str, logger: logging.Logger = logger):
+    """
+    Add a file handler to the logger
+
+    :param logfile: The file to add to the logger
+    :type logfile: str
+    :param logger: The logger to add the file to
+    :type logger: logging.Logger
+    """
+
+    fh = logging.FileHandler(logfile, "w", encoding="utf-8")
+    fh.setLevel(logger.level)
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            fh.setFormatter(handler.formatter)
+            break
+    logger.debug(f'Adding file handler to stream "{Path(fh.stream.name).absolute()}"')
+    logger.addHandler(fh)
+
+
+def remove_log_handler(logfile: str, logger: logging.Logger = logger):
+    """
+    Docstring for remove_log_handler
+
+    :param logfile: Description
+    :type logfile: str
+    :param logger: Description
+    :type logger: logging.Logger
+    """
+    logfile = Path(logfile).absolute()
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            stream_path = Path(handler.stream.name)
+            if stream_path == logfile:
+                logger.debug(f'Removing file handler to stream "{stream_path}"')
+                handler.close()
+                logger.removeHandler(handler)
+
 
 # Submodule imports
 from . import Emil

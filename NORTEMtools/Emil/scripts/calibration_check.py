@@ -1,5 +1,4 @@
-from NORTEMtools import logger as NORTEMlogger
-from NORTEMtools import make_logger
+from NORTEMtools import logger, add_log_hander, remove_log_handler
 
 from NORTEMtools.Emil.utils import (
     MyPath,
@@ -234,12 +233,7 @@ def main():
     else:
         output_dir = MyPath(args.output_dir) / output_dir_name
     output_dir.mkdir(parents=True, exist_ok=True)
-    logger = make_logger(
-        output_dir / "log.txt"
-    )  # Create a separate logger for this script
-    [
-        NORTEMlogger.addHandler(handler) for handler in logger.handlers
-    ]  # Add the handlers of this logger to the NORTEMlogger.
+    add_log_hander(output_dir / "log.txt")
 
     # Print parser description and arguments to log
     parser_description = "Calibration check script arguments:"
@@ -347,6 +341,8 @@ def main():
     logger.info(f"Summary statistics saved to {summary_csv_path}")
 
     logger.info("Calibration check process completed successfully.")
+
+    remove_log_handler(output_dir / "log.txt")
     gc.collect()
 
 
