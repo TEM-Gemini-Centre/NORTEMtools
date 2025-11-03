@@ -38,8 +38,12 @@ def result2DataFrame(
         )
     else:
         logger.debug(f"Using coordinates from metadata: {coords!s}")
-        xs = np.array(coords)[:, 0].reshape(signal.axes_manager.navigation_shape)
-        ys = np.array(coords)[:, 1].reshape(signal.axes_manager.navigation_shape)
+        xs = np.array(coords)[:, 0].reshape(
+            signal.axes_manager.navigation_shape, order="A"
+        )
+        ys = np.array(coords)[:, 1].reshape(
+            signal.axes_manager.navigation_shape, order="A"
+        )
         logger.debug(f"xs={xs}\nys={ys}")
 
     results = pd.DataFrame()
