@@ -444,7 +444,7 @@ def pick_random(
     for c in coords:
         logger.debug(f"Getting signal at pixel coordinate ({c[0]}, {c[1]})")
         selection.append(signal.inav[c[0], c[1]].data)
-    selection_string = "\n\t".join(selection.shape)
+    selection_string = "\n\t".join(selection)
     logger.debug(f"Got selected signal data with shapes:\n\t{selection_string}")
     # NB The length of coords must be an even number for the code below to work.
     new_shape = (2, -1, 256, 256)
