@@ -439,13 +439,22 @@ def pick_random(
         except Exception as e:
             logger.error(f"Failed to save VBF coordinates figure: {e}")
         plt.close()
-
-    selection = [signal.inav[c[0], c[1]].data for c in coords]
+    logger.debug("Selecting pixels from dataset")
+    selection = []
+    for c in coords:
+        logger.debug(f"Getting signal at pixel coordinate ({c[0]}, {c[1]})")
+        selection.append(signal.inav[c[0], c[1]].data)
+    selection_string = "\n\t".join(selection.shape)
+    logger.debug(f"Got selected signal data with shapes:\n\t{selection_string}")
     # NB The length of coords must be an even number for the code below to work.
-    selection = np.reshape(selection, (2, -1, 256, 256))
+    new_shape = (2, -1, 256, 256)
+    logger.debug(f"Reshaping selected signals to shape {new_shape}")
+    selection = np.reshape(selection, new_shape)
+    logger.debug(f"Reshaped signal has shape {selection.shape}")
 
     logger.debug("Creating ElectronDiffraction2D signal from selected patterns...")
     selection = pxm.signals.ElectronDiffraction2D(selection)
+    logger.debug(f"Casted reshaped signal into hyperspy signal: {selection}")
 
     logger.debug("Adding metadata to selected patterns signal...")
     selection.metadata.add_dictionary(signal.metadata.as_dictionary())
