@@ -444,18 +444,24 @@ def pick_random(
     for c in coords:
         logger.debug(f"Getting signal at pixel coordinate ({c[0]}, {c[1]})")
         selection.append(signal.inav[c[0], c[1]].data)
-    selection_string = "\n\t".join(selection)
-    logger.debug(f"Got selected signal data with shapes:\n\t{selection_string}")
+    logger.debug(f"Got {len(selection)} signals from signal")
+    for s, c in zip(selection, coords):
+        assert s == signal.inav[c].data, f'Data at coordinate {c} is not equal to the corresponding data in the selection'
+
     # NB The length of coords must be an even number for the code below to work.
     new_shape = (2, -1, 256, 256)
     logger.debug(f"Reshaping selected signals to shape {new_shape}")
     selection = np.reshape(selection, new_shape)
     logger.debug(f"Reshaped signal has shape {selection.shape}")
+    #for i, s, c in enumerate(zip(selection, coords)):
+    #    logger.debug(f'Verifying that data at location {i} is equal to data at coordinate {c}')
+    #    assert s == signal.inav[c[0], c[1]].data, f'Data at coordinate {c} is not equal to the corresponding data in the selection'
+    #    assert selection[i] == signal.inav[c[0], c[1]].data, f'Data at location {i} in selected signal should be equal to data at coordinate {c} in signal'
 
     logger.debug("Creating ElectronDiffraction2D signal from selected patterns...")
     selection = pxm.signals.ElectronDiffraction2D(selection)
-    logger.debug(f"Casted reshaped signal into hyperspy signal: {selection}")
-
+    logger.debug(f"Cast reshaped signal into hyperspy signal: {selection}")
+            
     logger.debug("Adding metadata to selected patterns signal...")
     selection.metadata.add_dictionary(signal.metadata.as_dictionary())
     selection.metadata.General.title = "Selected random patterns for template matching"
