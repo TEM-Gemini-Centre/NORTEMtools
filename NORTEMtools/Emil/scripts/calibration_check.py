@@ -128,17 +128,16 @@ def test_calibration(
             else:
                 out_image_dir = MyPath(out_image_dir)
 
-            if out_image_dir.is_dir():
-                pass
-            else:
-                logger.warning(
-                    f'Expected `out_image_dir`="{out_image_dir.absolute()}" to be a path to a directory. Using the parent {out_image_dir.parent} instead'
-                )
-                out_image_dir = out_image_dir.parent
+            out_image_dir = out_image_dir
+
             out_image_dir.mkdir(parents=True, exist_ok=True)
 
             save_pixel_results(
-                res, signal, max_pixels=max_pixels, output_dir=out_image_dir
+                res,
+                signal,
+                max_pixels=max_pixels,
+                output_dir=out_image_dir,
+                label=f"{i}",
             )
 
         logger.debug("Creating DataFrame from template matching result...")
