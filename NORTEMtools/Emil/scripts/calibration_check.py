@@ -228,6 +228,7 @@ def main():
     )
     args = parser.parse_args()
     set_log_level(logger, args.verbosity)
+    logger.debug(f"Logger level = {logger.level}")
 
     # Get the input path of the data file. Log files will be saved in the same directory.
     input_path = MyPath(args.input_file)
@@ -309,7 +310,7 @@ def main():
         intensity_transform_function=log_shift if args.log_shift else None,
         npt=args.npt,
         out_image_dir=output_dir,
-        save_frames=logger.level > 10,
+        save_frames=logger.level > 10 or True,
     )
     logger.info("Calibration check completed.")
 
