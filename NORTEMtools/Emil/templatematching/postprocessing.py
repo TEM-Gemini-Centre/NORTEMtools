@@ -4,7 +4,7 @@ This module contains tools to postprocess templatematching results.
 
 from NORTEMtools.Emil.utils import MyPath, frame_string
 from NORTEMtools import logger
-from typing import Union
+from typing import Union, Dict
 import pandas as pd
 import pyxem as pxm
 import seaborn as sb
@@ -13,21 +13,38 @@ import matplotlib.pyplot as plt
 import hyperspy.api as hs
 
 
+_default_plot_kwargs = {"cmap": "magma_r", "norm": "symlog"}
+
+_default_marker_kwargs = {
+    "include_intensity": False,
+    "annotate": True,
+    "permanent": True,
+}
+
+
 def show_results(
     result: pxm.signals.indexation_results.OrientationMap,
     signal: pxm.signals.ElectronDiffraction2D,
     n_best: int = 1,
-    x: int = 0,
-    y: int = 0,
+    plot_kwargs: Union[None, Dict] = None,
     **kwargs,
 ):
 
+    if plot_kwargs is None:
+        plot_kwargs = {}
+
+    _ = [
+        plot_kwargs.update(key, kwargs.get(key, _default_plot_kwargs[key]))
+        for key in _default_plot_kwargs
+    ]
+    _ = [
+        kwargs.update(key, _default_marker_kwargs.get(key, _default_marker_kwargs[key]))
+        for key in _default_marker_kwargs
+    ]
+
     signal = signal.deepcopy()
-    signal.plot(**kwargs)
-    signal.add_marker(
-        result.to_markers(n_best=n_best, include_intensity=True, annotate=True),
-        permanent=True,
-    )
+    signal.plot(**plot_kwargs)
+    signal.add_marker(result.to_markers(n_best=n_best, **kwargs))
 
 
 def result2DataFrame(
@@ -138,7 +155,7 @@ def result2DataFrame(
 def summarize_results(
     results: pd.DataFrame,
     output_path: MyPath,
-    groupby_column: str = "Location",
+    groupby_column: str = "Pixels",
     title: str = "",
 ) -> pd.DataFrame:
     """
