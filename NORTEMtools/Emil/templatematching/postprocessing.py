@@ -13,6 +13,23 @@ import matplotlib.pyplot as plt
 import hyperspy.api as hs
 
 
+def show_results(
+    result: pxm.signals.indexation_results.OrientationMap,
+    signal: pxm.signals.ElectronDiffraction2D,
+    n_best: int = 1,
+    x: int = 0,
+    y: int = 0,
+    **kwargs,
+):
+
+    signal = signal.deepcopy()
+    signal.plot(**kwargs)
+    signal.add_marker(
+        result.to_markers(n_best=n_best, include_intensity=True, annotate=True),
+        permanent=True,
+    )
+
+
 def result2DataFrame(
     result: pxm.signals.indexation_results.OrientationMap,
     signal: pxm.signals.ElectronDiffraction2D,
@@ -66,7 +83,7 @@ def result2DataFrame(
                 },
                 index=[0],
             )
-            location = i * result.axes_manager[1].size + j
+            location = i + j * result.axes_manager[0].size
             position = f"({i}, {j})"
             pixels = (
                 (f"({int(xs[i, j])}, {int(ys[i, j])})") if coords is not None else None
