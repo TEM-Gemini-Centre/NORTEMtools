@@ -120,7 +120,7 @@ def save_pixel_results(
         vector_kwargs.update(
             {key: _default_vector_kwargs.get(key, _default_vector_kwargs[key])}
         )
-        for key in _default_marker_kwargs
+        for key in _default_vector_kwargs
     ]
 
     if output_dir is None:
