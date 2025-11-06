@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=CPUQ
 #SBATCH --cpus-per-task=5
-#SBATCH --time=0-00:20:00
+#SBATCH --time=0-03:00:00
 #SBATCH --job-name="CalCheck"
 #SBATCH --mem=64000
 #SBATCH --mail-type=END,FAIL,START
