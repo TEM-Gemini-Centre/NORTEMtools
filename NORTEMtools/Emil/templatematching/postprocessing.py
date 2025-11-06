@@ -60,7 +60,7 @@ def result2DataFrame(
         )
     else:
         logger.debug(f"Using coordinates from metadata: {coords!s}")
-        order = "A"
+        order = "F"
         navigation_shape = signal.axes_manager.navigation_shape
         coords_array = np.array(coords)
         logger.debug(
