@@ -335,7 +335,7 @@ def main():
         n=args.n,
         intensity_transform_function=log_shift if args.log_shift else None,
         npt=args.npt,
-        out_image_dir=output_dir / "images",
+        out_image_dir=output_dir / r"images/",
         save_pixels=args.show_results,
         max_pixels=args.max_pixels,
     )

@@ -107,6 +107,9 @@ def save_pixel_results(
     if plot_kwargs is None:
         plot_kwargs = {}
 
+    if vector_kwargs is None:
+        vector_kwargs = {}
+
     _ = [
         plot_kwargs.update(
             {key: _default_plot_kwargs.get(key, _default_plot_kwargs[key])}
@@ -124,13 +127,7 @@ def save_pixel_results(
         output_dir = MyPath(".")
     else:
         output_dir = MyPath(output_dir)
-    if output_dir.is_dir():
-        pass
-    else:
-        logger.warning(
-            f'Output directory "{output_dir}" is not a directory. Using the parent directory instead: {output_dir.parent}'
-        )
-        output_dir = output_dir.parent
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.debug(
