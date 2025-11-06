@@ -388,8 +388,8 @@ def pick_random(
 
     if show:
         logger.debug("Generating VBF coordinates figure...")
-        xs = signal.axes_manager[0].axis
-        ys = signal.axes_manager[1].axis
+        xs = signal.axes_manager[-2].axis
+        ys = signal.axes_manager[-1].axis
         cx, cy = (
             xs[len(xs) // 2],
             ys[len(ys) // 2],
