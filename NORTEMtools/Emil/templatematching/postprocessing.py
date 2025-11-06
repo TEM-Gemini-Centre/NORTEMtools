@@ -54,7 +54,9 @@ def show_results(
         plot_kwargs = {}
 
     _ = [
-        plot_kwargs.update(key, kwargs.get(key, _default_plot_kwargs[key]))
+        plot_kwargs.update(
+            key, _default_plot_kwargs.get(key, _default_plot_kwargs[key])
+        )
         for key in _default_plot_kwargs
     ]
     _ = [
@@ -99,6 +101,22 @@ def save_pixel_results(
     :returns: 2-tuple with the signal figure and the navigation figure handles.
     :rtype: tuple
     """
+
+    if plot_kwargs is None:
+        plot_kwargs = {}
+
+    _ = [
+        plot_kwargs.update(
+            key, _default_plot_kwargs.get(key, _default_plot_kwargs[key])
+        )
+        for key in _default_plot_kwargs
+    ]
+    _ = [
+        vector_kwargs.update(
+            key, _default_vector_kwargs.get(key, _default_vector_kwargs[key])
+        )
+        for key in _default_marker_kwargs
+    ]
 
     if output_dir is None:
         output_dir = MyPath(".")
