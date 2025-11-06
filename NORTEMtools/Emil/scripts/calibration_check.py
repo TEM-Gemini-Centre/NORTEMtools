@@ -309,7 +309,7 @@ def main():
         n=args.n,
         intensity_transform_function=log_shift if args.log_shift else None,
         npt=args.npt,
-        out_image_dir=output_dir,
+        out_image_dir=output_dir / "images",
         save_frames=logger.level > 10 or True,
     )
     logger.info("Calibration check completed.")
