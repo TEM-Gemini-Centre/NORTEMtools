@@ -14,6 +14,7 @@ from NORTEMtools.Emil.templatematching.io import load_template
 from NORTEMtools.Emil.templatematching.postprocessing import (
     result2DataFrame,
     summarize_results,
+    save_pixel_results,
 )
 
 import numpy as np
@@ -38,7 +39,8 @@ def test_calibration(
     intensity_transform_function: Union[None, Callable] = None,
     npt: Union[None, int] = None,
     out_image_dir: Union[None, MyPath] = None,
-    save_frames: bool = False,
+    save_pixels: bool = False,
+    max_pixels: int = 50,
 ) -> pd.DataFrame:
     """
     Test calibration of a 4DSTEM signal using template matching over a range of calibration factors.
@@ -120,14 +122,27 @@ def test_calibration(
             show_progressbar=False,
         )
 
+        if save_pixels:
+            if out_image_dir is None:
+                out_image_dir = MyPath(".")
+            else:
+                out_image_dir = MyPath(out_image_dir)
+
+            if out_image_dir.is_dir():
+                pass
+            else:
+                logger.warning(
+                    f'Expected `out_image_dir`="{out_image_dir.absolute()}" to be a path to a directory. Using the parent {out_image_dir.parent} instead'
+                )
+                out_image_dir = out_image_dir.parent
+            out_image_dir.mkdir(parents=True, exist_ok=True)
+
+            save_pixel_results(
+                res, signal, max_pixels=max_pixels, output_dir=out_image_dir
+            )
+
         logger.debug("Creating DataFrame from template matching result...")
-        df = result2DataFrame(
-            res,
-            signal,
-            save_frames=save_frames,
-            out_image_dir=out_image_dir,
-            title=f"{i}",
-        )
+        df = result2DataFrame(res, signal)
 
         logger.debug("Appending results to overall DataFrame...")
         results = pd.concat([results, df], ignore_index=True)
@@ -226,6 +241,17 @@ def main():
         default="",
         help="Name for the output files. Output files are timestamped. If not provided, the name of the input file is used.",
     )
+    parser.add_argument(
+        "--show_results",
+        action="store_true",
+        help="Whether to store individual pixel results with templates overlaid",
+    )
+    parser.add_argument(
+        "--max_pixels",
+        type=int,
+        default=50,
+        help="The maximum number of pixels to show if `--show_results=True` (see above). This is to avoid outputting a huge amount of image files if run on a large selection of the data.",
+    )
     args = parser.parse_args()
     set_log_level(logger, args.verbosity)
     logger.debug(f"Logger level = {logger.level}")
@@ -310,7 +336,8 @@ def main():
         intensity_transform_function=log_shift if args.log_shift else None,
         npt=args.npt,
         out_image_dir=output_dir / "images",
-        save_frames=logger.level > 10 or True,
+        save_pixels=args.show_results,
+        max_pixels=args.max_pixels,
     )
     logger.info("Calibration check completed.")
 

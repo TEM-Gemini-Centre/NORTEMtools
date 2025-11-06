@@ -13,13 +13,20 @@ import matplotlib.pyplot as plt
 import hyperspy.api as hs
 
 
-_default_plot_kwargs = {"cmap": "magma_r", "norm": "symlog"}
+_default_plot_kwargs = {
+    "cmap": "magma_r",
+    "norm": "symlog",
+    "colorbar": None,
+    "axes_off": True,
+}
 
 _default_marker_kwargs = {
     "include_intensity": False,
     "annotate": True,
     "permanent": True,
 }
+
+_default_vector_kwargs = {"annotate": True, "fast": False}
 
 
 def show_results(
@@ -29,6 +36,19 @@ def show_results(
     plot_kwargs: Union[None, Dict] = None,
     **kwargs,
 ):
+    f"""
+    Plot the signal and add markers for the template matching results.
+    
+    :param result: The template matching results
+    :type result: pxm.signals.indexation_results.OrientationMap
+    :param signal: The signal to show the results for
+    :type signal: pxm.signals.ElectronDiffraction2D
+    :param n_best: Which `n_best` to show
+    :type n_best: int
+    :param plot_kwargs: Optional keyword arguments passed to `signal.plot()`. Default values are {_default_plot_kwargs}
+    :type plot_kwargs: Union[None, Dict]
+    :param kwargs: Optional keyword arguments passed to `result.to_markers()`
+    """
 
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -47,12 +67,90 @@ def show_results(
     signal.add_marker(result.to_markers(n_best=n_best, **kwargs))
 
 
+def save_pixel_results(
+    result: pxm.signals.indexation_results.OrientationMap,
+    signal: pxm.signals.ElectronDiffraction2D,
+    plot_kwargs: Union[None, Dict] = None,
+    vector_kwargs: Union[None, Dict] = None,
+    output_dir: Union[None, MyPath] = None,
+    dpi: int = 300,
+    max_pixels: int = 50,
+):
+    f"""
+    Show template matching results for individual pixels.
+
+    This will generate two plots for each pixel: a navigator plot and a signal plot. This should be avoided for large datasets.
+
+    :param result: The orientation mapping results.
+    :type result: pxm.signals.indexation_results.OrientationMap
+    :param signal: The signal to plot the results for.
+    :type signal: pxm.signals.ElectronDiffraction2D
+    :param plot_kwargs: Optional keyword arguments passed to signal.plot(), Default values are {_default_plot_kwargs!r}.
+    :type plot_kwargs: Union[None, Dict]
+    :param vector_kwargs: The keyword arguments passed to `result.to_single_phase_markers()`. Default values are {_default_vector_kwargs!r}.
+    :type vector_kwargs: Union[None, Dict]
+    :param output_dir: The directory to save the pixel results.
+    :type output_dir: Union[None, MyPath]
+    :param dpi: The DPI of the plots to be saved.
+    :type dpi: int
+    :param max_pixels: The maximum number of pixels to generate plots for.
+    :type max_pixels: int
+
+    :returns: 2-tuple with the signal figure and the navigation figure handles.
+    :rtype: tuple
+    """
+
+    if output_dir is None:
+        output_dir = MyPath(".")
+    else:
+        output_dir = MyPath(output_dir)
+    if output_dir.is_dir():
+        pass
+    else:
+        logger.warning(
+            f'Output directory "{output_dir}" is not a directory. Using the parent directory instead: {output_dir.parent}'
+        )
+        output_dir = output_dir.parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.debug(
+        f"Plotting results over signal with following parameters:\n\tvector_kwargs: {vector_kwargs!r}\n\tplot_kwargs: {plot_kwargs!r}"
+    )
+    result.plot_over_signal(
+        signal,
+        add_ipf_correlation_heatmap=True,
+        vector_kwargs=vector_kwargs,
+        **plot_kwargs,
+    )
+
+    logger.debug("Iterating through plots to save individual pixel results")
+    signal_fig = plt.gcf()
+    navigator_fig = plt.figure(signal_fig.number - 1)
+
+    counter = 0
+    for i in range(signal.axes_manager.navigation_shape[0]):
+        for j in range(signal.axes_manager.navigation_shape[1]):
+            if counter >= max_pixels:
+                logger.info(
+                    f"Maximum number of images ({max_pixels}) generated. To generate more images, please increase the `max_pixels` parameter"
+                )
+                return signal_fig, navigator_fig
+
+            output_path = output_dir / f"{i}_{j}.png"
+            logger.debug(
+                f'Changing indices to ({i}, {j}) and saving plots to "{output_path}"'
+            )
+            signal.axes_manager.indices = (i, j)
+            signal_fig.savefig(output_path.append("signal"), dpi=dpi)
+            navigator_fig.savefig(output_path.append("navigator"), dpi=dpi)
+            counter += 1
+
+    return signal_fig, navigator_fig
+
+
 def result2DataFrame(
     result: pxm.signals.indexation_results.OrientationMap,
     signal: pxm.signals.ElectronDiffraction2D,
-    save_frames: bool = False,
-    out_image_dir: Union[None, str, MyPath] = None,
-    title=Union[None, str],
 ) -> pd.DataFrame:
     """
     Convert a template matching result into a pandas DataFrame.
@@ -113,40 +211,6 @@ def result2DataFrame(
             logger.debug(
                 f"Dataframe for location {location} = {position} (pixels {pixels}):\n{str(df)}"
             )
-
-            if save_frames:
-                frame = signal.inav[i, j]
-                if out_image_dir is None:
-                    out_image_dir = MyPath(".")
-                else:
-                    out_image_dir = MyPath(out_image_dir)
-
-                if out_image_dir.is_dir:
-                    pass
-                else:
-                    logger.warning(
-                        f"Expected a path to a directory to put frames, not a complete path {out_image_dir}. Continuing using the parent of the provided path: {out_image_dir.parent}"
-                    )
-                    out_image_dir = out_image_dir.parent
-
-                if title is None:
-                    title = signal.metadata.General.title
-
-                out_image_path = (
-                    out_image_dir
-                    / f"{location}_{i}_{j}_{xs[i,j]}_{ys[i,j]}_{title}.hspy"
-                )
-
-                out_image_path.append(f"{signal.axes_manager[-1].scale}")
-                out_image_path.parent.mkdir(exist_ok=True)
-                logger.info(f'Saving image data to "{out_image_path}"')
-                frame.save(out_image_path, overwrite=True)
-
-                hs.plot.plot_images(frame)
-                fig = plt.gcf()
-                logger.info(f'Saving image plot to "{out_image_path}"')
-                fig.savefig(out_image_path.with_suffix(".png"), dpi=300)
-                plt.close(fig)
 
     logger.debug(f"Result DataFrame:\n{results.to_string()}")
     return results

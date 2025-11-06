@@ -1,5 +1,10 @@
 from .io import save_template, load_template
-from .postprocessing import result2DataFrame, summarize_results
+from .postprocessing import (
+    result2DataFrame,
+    summarize_results,
+    save_pixel_results,
+    show_results,
+)
 from NORTEMtools import logger
 from NORTEMtools.Emil.utils import MyPath
 
@@ -137,4 +142,6 @@ __all__ = [
     "result2DataFrame",
     "summarize_results",
     "MyBank",
+    "show_results",
+    "save_pixel_results",
 ]
