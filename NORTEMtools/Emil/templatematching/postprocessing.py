@@ -37,13 +37,13 @@ def result2DataFrame(
             "No coordinates found in signal metadata; proceeding without position information."
         )
     else:
-        logger.debug(f"Using coordinates from metadata: {coords!s}")
-        xs = np.array(coords)[:, 0].reshape(
-            signal.axes_manager.navigation_shape, order="A"
-        )
-        ys = np.array(coords)[:, 1].reshape(
-            signal.axes_manager.navigation_shape, order="A"
-        )
+        logger.debug(f'Using coordinates from metadata: {coords!s}')
+        order = 'A'
+        navigation_shape = signal.axes_manager.navigation_shape
+        coords_array = np.array(coords)
+        logger.debug(f'Reshaping coordinate array {coords_array}:\nnavigation shape: {navigation_shape}\norder: "{order}"')
+        xs = coords_array[:, 0].reshape(navigation_shape, order=order)
+        ys = coords_array[:, 1].reshape(navigation_shape, order=order)
         logger.debug(f"xs={xs}\nys={ys}")
 
     results = pd.DataFrame()
