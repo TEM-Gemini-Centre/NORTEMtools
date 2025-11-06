@@ -4,16 +4,21 @@ This module contains tools to postprocess templatematching results.
 
 from NORTEMtools.Emil.utils import MyPath, frame_string
 from NORTEMtools import logger
+from typing import Union
 import pandas as pd
 import pyxem as pxm
 import seaborn as sb
 import numpy as np
 import matplotlib.pyplot as plt
+import hyperspy.api as hs
 
 
 def result2DataFrame(
     result: pxm.signals.indexation_results.OrientationMap,
     signal: pxm.signals.ElectronDiffraction2D,
+    save_frames: bool = False,
+    out_image_dir: Union[None, str, MyPath] = None,
+    title=Union[None, str],
 ) -> pd.DataFrame:
     """
     Convert a template matching result into a pandas DataFrame.
@@ -37,11 +42,13 @@ def result2DataFrame(
             "No coordinates found in signal metadata; proceeding without position information."
         )
     else:
-        logger.debug(f'Using coordinates from metadata: {coords!s}')
-        order = 'A'
+        logger.debug(f"Using coordinates from metadata: {coords!s}")
+        order = "A"
         navigation_shape = signal.axes_manager.navigation_shape
         coords_array = np.array(coords)
-        logger.debug(f'Reshaping coordinate array {coords_array}:\nnavigation shape: {navigation_shape}\norder: "{order}"')
+        logger.debug(
+            f'Reshaping coordinate array {coords_array}:\nnavigation shape: {navigation_shape}\norder: "{order}"'
+        )
         xs = coords_array[:, 0].reshape(navigation_shape, order=order)
         ys = coords_array[:, 1].reshape(navigation_shape, order=order)
         logger.debug(f"xs={xs}\nys={ys}")
@@ -72,6 +79,40 @@ def result2DataFrame(
             logger.debug(
                 f"Dataframe for location {location} = {position} (pixels {pixels}):\n{str(df)}"
             )
+
+            if save_frames:
+                frame = signal.inav[i, j]
+                if out_image_dir is None:
+                    out_image_dir = MyPath(".")
+                else:
+                    out_image_dir = MyPath(out_image_dir)
+
+                if out_image_dir.is_dir:
+                    pass
+                else:
+                    logger.warning(
+                        f"Expected a path to a directory to put frames, not a complete path {out_image_dir}. Continuing using the parent of the provided path: {out_image_dir.parent}"
+                    )
+                    out_image_dir = out_image_dir.parent
+
+                if title is None:
+                    title = signal.metadata.General.title
+
+                out_image_path = (
+                    out_image_dir
+                    / f"{location}_{i}_{j}_{xs[i,j]}_{ys[i,j]}_{title}.hspy"
+                )
+
+                out_image_path.append(f"{signal.axes_manager[-1].scale}")
+                out_image_path.parent.mkdir(exist_ok=True)
+                logger.info(f'Saving image data to "{out_image_path}"')
+                frame.save(out_image_path, overwrite=True)
+
+                hs.plot.plot_images(frame)
+                fig = plt.gcf()
+                logger.info(f'Saving image plot to "{out_image_path}"')
+                fig.savefig(out_image_path.with_suffix(".png"), dpi=300)
+                plt.close(fig)
 
     logger.debug(f"Result DataFrame:\n{results.to_string()}")
     return results

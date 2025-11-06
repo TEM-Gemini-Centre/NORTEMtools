@@ -37,6 +37,8 @@ def test_calibration(
     n: int,
     intensity_transform_function: Union[None, Callable] = None,
     npt: Union[None, int] = None,
+    out_image_dir: Union[None, MyPath] = None,
+    save_frames: bool = False,
 ) -> pd.DataFrame:
     """
     Test calibration of a 4DSTEM signal using template matching over a range of calibration factors.
@@ -119,7 +121,13 @@ def test_calibration(
         )
 
         logger.debug("Creating DataFrame from template matching result...")
-        df = result2DataFrame(res, signal)
+        df = result2DataFrame(
+            res,
+            signal,
+            save_frames=save_frames,
+            out_image_dir=out_image_dir,
+            title=f"{i}",
+        )
 
         logger.debug("Appending results to overall DataFrame...")
         results = pd.concat([results, df], ignore_index=True)
@@ -286,6 +294,9 @@ def main():
         show=True,
         output_path=output_dir / "vbf_coordinates.png",
     )
+    out_signal_path = output_dir / "selected.hspy"
+    logger.info(f'Saving selected signal to "{out_signal_path}"')
+    random_signal.save(out_signal_path, overwrite=True)
 
     # Perform calibration check
     logger.info("Performing calibration check...")
@@ -297,6 +308,8 @@ def main():
         n=args.n,
         intensity_transform_function=log_shift if args.log_shift else None,
         npt=args.npt,
+        out_image_dir=output_dir,
+        save_frames=logger.level > 10,
     )
     logger.info("Calibration check completed.")
 
