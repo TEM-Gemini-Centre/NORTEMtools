@@ -79,6 +79,7 @@ def save_pixel_results(
     output_dir: Union[None, MyPath] = None,
     dpi: int = 300,
     max_pixels: int = 50,
+    label: Union[None, str] = None,
 ):
     f"""
     Show template matching results for individual pixels.
@@ -130,6 +131,11 @@ def save_pixel_results(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    if label is None:
+        label = ""
+    else:
+        label = f"_{label}"
+
     logger.debug(
         f"Plotting results over signal with following parameters:\n\tvector_kwargs: {vector_kwargs!r}\n\tplot_kwargs: {plot_kwargs!r}"
     )
@@ -158,8 +164,8 @@ def save_pixel_results(
                 f'Changing indices to ({i}, {j}) and saving plots to "{output_path}"'
             )
             signal.axes_manager.indices = (i, j)
-            signal_fig.savefig(output_path.append("signal"), dpi=dpi)
-            navigator_fig.savefig(output_path.append("navigator"), dpi=dpi)
+            signal_fig.savefig(output_path.append(f"signal{label}"), dpi=dpi)
+            navigator_fig.savefig(output_path.append(f"navigator{label}"), dpi=dpi)
             counter += 1
 
     return signal_fig, navigator_fig
