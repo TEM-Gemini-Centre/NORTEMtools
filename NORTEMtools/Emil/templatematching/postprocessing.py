@@ -55,12 +55,14 @@ def show_results(
 
     _ = [
         plot_kwargs.update(
-            key, _default_plot_kwargs.get(key, _default_plot_kwargs[key])
+            {key: _default_plot_kwargs.get(key, _default_plot_kwargs[key])}
         )
         for key in _default_plot_kwargs
     ]
     _ = [
-        kwargs.update(key, _default_marker_kwargs.get(key, _default_marker_kwargs[key]))
+        kwargs.update(
+            {key: _default_marker_kwargs.get(key, _default_marker_kwargs[key])}
+        )
         for key in _default_marker_kwargs
     ]
 
@@ -107,13 +109,13 @@ def save_pixel_results(
 
     _ = [
         plot_kwargs.update(
-            key, _default_plot_kwargs.get(key, _default_plot_kwargs[key])
+            {key: _default_plot_kwargs.get(key, _default_plot_kwargs[key])}
         )
         for key in _default_plot_kwargs
     ]
     _ = [
         vector_kwargs.update(
-            key, _default_vector_kwargs.get(key, _default_vector_kwargs[key])
+            {key: _default_vector_kwargs.get(key, _default_vector_kwargs[key])}
         )
         for key in _default_marker_kwargs
     ]
