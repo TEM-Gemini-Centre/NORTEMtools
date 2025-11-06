@@ -351,7 +351,7 @@ def main():
     logger.info("Generating calibration plot...")
     plt.figure()
     try:
-        sb.lineplot(data=results, x="Calibration", y="Correlation", hue="Location")
+        sb.lineplot(data=results, x="Calibration", y="Correlation", hue="Pixels")
     except Exception as e:
         logger.error(
             f"Failed to generate calibration plot: {e}\nGenerating plot without hue."
