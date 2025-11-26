@@ -11,11 +11,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pyxem as pxm
 from pathlib import Path
-from typing import Union, Dict
+from typing import Union, Dict, Any, List
 from zarr import NestedDirectoryStore, ZipStore
 from json import load as jload
+import json
 import argparse
 import logging
+import itertools
 
 Signal = Union[pxm.signals.ElectronDiffraction2D, pxm.signals.LazyDiffraction2D]
 
@@ -876,6 +878,193 @@ def set_calibrations(
     logger.info(f"Calibrated axes manager:\n{signal.axes_manager}")
 
 
+def get_files_in_directory(
+    directory: Path, suffix: str = ".jh5", recursive: bool = True
+) -> Dict:
+    """Get all files with a given suffix in a directory."""
+    directory = MyPath(directory)
+    files = []
+    for path in directory.iterdir():
+        if path.is_dir():
+            files.append(
+                get_files_in_directory(path, suffix=suffix, recursive=recursive)
+            )
+        elif path.suffix == suffix:
+            files.append(path)
+    files = list(filter(None, files))
+    return list(itertools.chain.from_iterable(np.asarray(b).ravel() for b in files))
+    # return files
+
+
+def move_all_axes(array: np.ndarray, n: int = 1) -> np.ndarray:
+    """
+    Move all axes of a NumPy array one position to the left.
+
+    This function shifts the axes of a multi-dimensional array by moving them
+    one position to the left. It effectively rotates
+    the axis positions in a circular manner. This is particularly useful when
+    working with data where the order of dimensions needs to be adjusted for
+    compatibility with certain libraries or analysis steps.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        Input NumPy array whose axes need to be shifted.
+    n : int, optional (default=1)
+        Number of positions to shift the axes. If n<1, no change is made.
+
+    Returns
+    -------
+    np.ndarray
+        A new array with axes shifted according to the specified number of positions.
+        The shape of the returned array remains unchanged.
+
+    Notes
+    -----
+    This function operates recursively. If n > 1, it calls itself with n-1 until
+    n becomes 1, at which point a single axis shift occurs.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> arr = np.random.rand(2, 3, 4)
+    >>> moved_arr = move_all_axes(arr, 1)
+    >>> print(arr.shape)
+    (2, 3, 4)
+    >>> print(moved_arr.shape)
+    (4, 2, 3)
+    """
+    # Base case: if n is less than 1, return the original array
+    if n < 1:
+        return array
+
+    # Determine the number of dimensions in the input array
+    dimension = len(array.shape)
+
+    # Create a list representing the original axis positions
+    original_positions = list(range(dimension))
+
+    # Create a new axis arrangement by shifting the last axis to the front
+    # This moves all axes one position to the left
+    moved_axis = np.moveaxis(
+        array, original_positions, [dimension - 1] + original_positions[:-1]
+    )
+
+    # If we only needed one shift, return the result
+    if n == 1:
+        return moved_axis
+    else:
+        # Otherwise, recursively call the function with n reduced by 1
+        return move_all_axes(moved_axis, n - 1)
+
+
+def reorder_dimensions(array: np.ndarray, dimensions: List) -> np.ndarray:
+    array = array.squeeze()
+
+    dimension_length = len(dimensions)
+    if dimension_length == 1:
+        return array
+    else:
+        return move_all_axes(array, dimension_length - 2)
+
+
+def unravel_dictionary(dictionary, *args, rtype=None):
+    logger.debug(
+        f"Unravelling dictionary with keys {list(dictionary.keys())} with args {args} and rtype {rtype}"
+    )
+    if len(args) == 0:
+        return dictionary
+    if len(args) == 1:
+        value = dictionary.get(args[0], None)
+
+        if value is None:
+            logger.warning(
+                f"Value extracted for key {args[0]} is {value} of type {type(value)} from dictionary {dictionary} with keys {list(dictionary.keys())}"
+            )
+
+        if rtype is not None:
+            if not isinstance(value, rtype):
+                raise ValueError(
+                    f"Value {value} of type {type(value)} unravelled from dictionary {dictionary}, is not of requested type {rtype})"
+                )
+        return value
+    else:
+        return unravel_dictionary(dictionary.get(args[0], {}), *args[1:], rtype=rtype)
+
+
+def str2dict(string: Union[str, None]) -> Dict[str, Any]:
+    """
+    Convert a JSON-formatted string representation of a dictionary into an actual Python dictionary.
+
+    This function attempts to parse a string that represents a dictionary in JSON format.
+    If the string contains nested dictionaries represented as strings, those will also be converted.
+
+    Parameters
+    ----------
+    string : str or None
+        A string representation of a dictionary in JSON format. Can contain nested
+        dictionaries as strings that will be recursively converted.
+
+    Returns
+    -------
+    dict
+        A Python dictionary parsed from the input string. If the input is None or an
+        empty string, returns an empty dictionary.
+
+    Raises
+    ------
+    TypeError
+        If the string cannot be parsed as JSON or if it's not a valid dictionary format.
+
+    Examples
+    --------
+    >>> str2dict('{"key": "value"}')
+    {'key': 'value'}
+
+    >>> str2dict('{"nested": "{\\"inner\\": \\"value\\"}"}')
+    {'nested': {'inner': 'value'}}
+    """
+    # Check if the input is a string
+    if isinstance(string, str):
+        # Replace single quotes with double quotes to make it valid JSON
+        string = string.replace("'", '"')
+
+        # Check if the string is non-empty
+        if len(string) > 0:
+            try:
+                # Attempt to parse the string as JSON into a dictionary
+                dictionary = json.loads(string)
+            except json.JSONDecodeError as e:
+                raise TypeError(
+                    f'Could not convert string "{string}" to a dictionary using json: {str(e)}'
+                )
+            except Exception as e:
+                # Catch any other unexpected errors and re-raise them as TypeError
+                raise TypeError(
+                    f'Unexpected error converting string "{string}" to a dictionary: {str(e)}'
+                )
+            else:
+                # If parsing was successful and result is a dictionary
+                if isinstance(dictionary, dict):
+                    # Create a copy of the dictionary to avoid modifying during iteration
+                    dict_copy = dictionary.copy()
+                    for key, value in dict_copy.items():
+                        if isinstance(value, str):
+                            try:
+                                dictionary[key] = str2dict(value)
+                            except Exception as e:
+                                # If recursive conversion fails, keep the original value
+                                pass
+                # Return the final processed dictionary
+                return dictionary
+        else:
+            return {}
+            # raise TypeError(f'Cannot convert empty string to dictionary')
+    else:
+        # If input is not a string, return an empty dictionary
+        return {}
+
+
 __all__ = [
     "Signal",
     "MyPath",
@@ -898,4 +1087,9 @@ __all__ = [
     "set_calibrations",
     "logger",
     "log_with_header",
+    "get_files_in_directory",
+    "move_all_axes",
+    "reorder_dimensions",
+    "unravel_dictionary",
+    "str2dict",
 ]
