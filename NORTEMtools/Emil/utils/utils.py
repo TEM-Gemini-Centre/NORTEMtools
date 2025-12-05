@@ -2,7 +2,7 @@
 This module contains utility functions for working with pyxem and hyperspy. It does not add new functionality or analysis tools, but simplifies code by defining commonly and frequently used functions that serve as wrappers around other analysis tools/code. For more information, please read the original documentation of hyperspy and pyxem.
 """
 
-from NORTEMtools import logger
+from NORTEMtools import _logger
 import hyperspy.api as hs
 
 hs.set_log_level("INFO")
@@ -22,11 +22,11 @@ import itertools
 Signal = Union[pxm.signals.ElectronDiffraction2D, pxm.signals.LazyDiffraction2D]
 
 
-def log_with_header(header, *messages, logger=logger):
+def log_with_header(header, *messages, logger=_logger):
     """
     Write to logger on INFO with a framed header.
 
-    Used to write "pretty-ish" information to a logger. This is essentially just a wrapper around the `frame_string()` function and calls to `logger.info()`.
+    Used to write "pretty-ish" information to a _logger. This is essentially just a wrapper around the `frame_string()` function and calls to `logger.info()`.
 
     :param header: The header to frame before the messages.
     :param messages: optional positional argument with messages to follow the header.
@@ -141,13 +141,13 @@ def load_metadata_from_json(filename: Union[None, MyPath]) -> Dict:
         filename = "metadata.json"
 
     if not filename.suffix == ".json":
-        logger.warning(
+        _logger.warning(
             f'Metadata file name "{filename}" is not a json file. I will change the suffix to .json instead before attempting to load.'
         )
         filename = filename.with_suffix(".json")
 
     metadata = jload(filename.open("r"))
-    logger.debug(f'Loaded metadata file "{filename}":\n{metadata}')
+    _logger.debug(f'Loaded metadata file "{filename}":\n{metadata}')
 
     return metadata
 
@@ -171,7 +171,7 @@ def metadata2json(filename: Union[None, MyPath], metadata: Dict):
         f"Metadata: {dict2string(metadata)}",
     )
 
-    logger.debug(f'Writing metadata file to "{filename}"')
+    _logger.debug(f'Writing metadata file to "{filename}"')
 
 
 def set_metadata(signal, metadata: Dict, metadata_key: str = "Custom"):
@@ -185,19 +185,19 @@ def set_metadata(signal, metadata: Dict, metadata_key: str = "Custom"):
 
     debug_string = "\n\t".join([f"{key}={metadata[key]}" for key in metadata])
 
-    logger.debug(
+    _logger.debug(
         f"Setting metadata of signal {signal} under the {metadata_key} key:\n\t{debug_string}"
     )
 
-    logger.debug(f"Signal metadata before:\n{signal.metadata}")
+    _logger.debug(f"Signal metadata before:\n{signal.metadata}")
     signal.metadata.add_dictionary({metadata_key: metadata})
-    logger.debug(f"Signal metadata after:\n{signal.metadata}")
+    _logger.debug(f"Signal metadata after:\n{signal.metadata}")
 
-    logger.debug(f"Signal original metadata before:\n{signal.original_metadata}")
+    _logger.debug(f"Signal original metadata before:\n{signal.original_metadata}")
     signal.original_metadata.add_dictionary({metadata_key: metadata})
-    logger.debug(f"Signal original metadata after:\n{signal.original_metadata}")
+    _logger.debug(f"Signal original metadata after:\n{signal.original_metadata}")
 
-    logger.info(
+    _logger.info(
         f'Added custom signal metadata under key "{metadata_key}":\n{signal.metadata.as_dict()[metadata_key]!s}'
     )
 
@@ -210,29 +210,29 @@ def set_experimental_parameters(signal, parameters: Dict) -> None:
     :param parameters: Description
     :type parameters: Dict
     """
-    logger.info(frame_string("Setting experimental parameters"))
+    _logger.info(frame_string("Setting experimental parameters"))
 
     # Log some infor for debugging
     debug_string = "\n\t".join([f"{key}={parameters[key]}" for key in parameters])
-    logger.debug(
+    _logger.debug(
         f"Got parameters for setting experimental parameters:\n\t{debug_string}"
     )
 
     # Set one experimental parameter at a time.
     for key in parameters:
         try:
-            logger.debug(f"Setting experimental parameter {key}={parameters[key]}")
+            _logger.debug(f"Setting experimental parameter {key}={parameters[key]}")
             signal.set_experimental_parameters(
                 **{key: parameters[key]}
             )  # Set one experimental parameter
-            logger.info(
+            _logger.info(
                 f"Set experimental parameter of signal: {key}={parameters[key]}"
             )
         except Exception as e:
-            logger.warning(
+            _logger.warning(
                 f"Could not set experimental parameter {key}={parameters[key]} due to error: {e}. Ignoring and continuing, but you might want to double check this."
             )
-    logger.debug(f"Finished setting experimental parameters.")
+    _logger.debug(f"Finished setting experimental parameters.")
 
 
 def load(path: MyPath, *args, **kwargs) -> Signal:
@@ -248,15 +248,15 @@ def load(path: MyPath, *args, **kwargs) -> Signal:
     log_with_header("Loading data", f'Loading data from "{path}"')
     if path.suffix.lower() == ".zspy":
         try:
-            logger.debug("Detected .zspy file; loading using NestedDirectoryStore.")
+            _logger.debug("Detected .zspy file; loading using NestedDirectoryStore.")
             store = NestedDirectoryStore(str(path))
             signal = hs.load(store, *args, **kwargs)
         except Exception as e:
-            logger.debug("Detected .zspy file; loading using zarr ZipStore.")
+            _logger.debug("Detected .zspy file; loading using zarr ZipStore.")
             store = ZipStore(str(path))
             signal = hs.load(store, *args, **kwargs)
     else:
-        logger.debug("Loading data")
+        _logger.debug("Loading data")
         signal = hs.load(str(path), *args, **kwargs)
 
     log_with_header(
@@ -266,7 +266,7 @@ def load(path: MyPath, *args, **kwargs) -> Signal:
         f"Current signal axes:\n{signal.axes_manager}",
     )
 
-    logger.debug(f"Current metadata:\n{signal.metadata.as_dictionary()!s}")
+    _logger.debug(f"Current metadata:\n{signal.metadata.as_dictionary()!s}")
 
     return signal
 
@@ -297,11 +297,11 @@ def compute(
 
     """
     try:
-        logger.debug("Computing signal...")
+        _logger.debug("Computing signal...")
         s.compute()
-        logger.debug("Signal computed successfully.")
+        _logger.debug("Signal computed successfully.")
     except Exception as e:
-        logger.debug(
+        _logger.debug(
             f"Error during computation: {e}\n Continuing without halting execution."
         )
     finally:
@@ -339,19 +339,19 @@ def get_random_coordinates(signal: Signal, n: int = 1, seed: int = 197405) -> li
     nx, ny = signal.axes_manager.navigation_shape
 
     if not n % 2 == 0:
-        logger.debug(
+        _logger.debug(
             "Number of random coordinates requested is not even; incrementing by 1 to make it even."
         )
         n += 1
 
     if n > nx * ny:
-        logger.debug(
+        _logger.debug(
             f"Number of random coordinates requested ({n}) exceeds total number of available coordinates ({nx*ny})."
         )
         n = nx * ny
-        logger.debug(f"Using max coordinates instead: n={n}.")
+        _logger.debug(f"Using max coordinates instead: n={n}.")
 
-    logger.debug(f"Picking {n} random coordinates with seed {seed}")
+    _logger.debug(f"Picking {n} random coordinates with seed {seed}")
 
     np.random.seed(seed)
     coords = []
@@ -360,7 +360,7 @@ def get_random_coordinates(signal: Signal, n: int = 1, seed: int = 197405) -> li
         y = np.random.randint(0, ny - 1)
         coords.append((x, y))
 
-    logger.debug(f"Picked random coordinates: {coords!s}")
+    _logger.debug(f"Picked random coordinates: {coords!s}")
     return coords
 
 
@@ -389,7 +389,7 @@ def pick_random(
     coords = get_random_coordinates(signal, *args, **kwargs)
 
     if show:
-        logger.debug("Generating VBF coordinates figure...")
+        _logger.debug("Generating VBF coordinates figure...")
         xs = signal.axes_manager[-2].axis
         ys = signal.axes_manager[-1].axis
         cx, cy = (
@@ -397,15 +397,15 @@ def pick_random(
             ys[len(ys) // 2],
         )  # Pick middle of the axis as center.
         r = max(xs) * 0.02  # 2 % of total maximum width
-        logger.debug(
+        _logger.debug(
             f"Center for VBF circle ROI: ({cx:.2f}, {cy:.2f}), radius: {r:.2f}"
         )
         try:
-            logger.debug("Computing VBF for coordinate visualization...")
+            _logger.debug("Computing VBF for coordinate visualization...")
             vbf = signal.get_integrated_intensity(hs.roi.CircleROI(cx, cy, r))
             compute(vbf)
         except Exception as e:
-            logger.error(
+            _logger.error(
                 f"Failed to compute VBF: {e}.\n Using total sum of pattern as image instead."
             )
             vbf = signal.nansum(axis=[2, 3])
@@ -430,46 +430,46 @@ def pick_random(
         try:
             if output_path is None:
                 output_path = MyPath("vbf_coords.png")
-                logger.warning(
+                _logger.warning(
                     f'Output path not provided; saving VBF coordinates figure to current directory instead: "{output_path}".'
                 )
             else:
                 pass
 
-            logger.info(f'Saving VBF coordinates figure to "{output_path}"')
+            _logger.info(f'Saving VBF coordinates figure to "{output_path}"')
             plt.savefig(output_path, dpi=300)
         except Exception as e:
-            logger.error(f"Failed to save VBF coordinates figure: {e}")
+            _logger.error(f"Failed to save VBF coordinates figure: {e}")
         plt.close()
-    logger.debug("Selecting pixels from dataset")
+    _logger.debug("Selecting pixels from dataset")
     selection = []
     for c in coords:
-        logger.debug(f"Getting signal at pixel coordinate ({c[0]}, {c[1]})")
+        _logger.debug(f"Getting signal at pixel coordinate ({c[0]}, {c[1]})")
         selection.append(signal.inav[c[0], c[1]].data)
-    logger.debug(f"Got {len(selection)} signals from signal")
+    _logger.debug(f"Got {len(selection)} signals from signal")
     # for s, c in zip(selection, coords):
     #    assert s == signal.inav[c].data, f'Data at coordinate {c} is not equal to the corresponding data in the selection'
 
     # NB The length of coords must be an even number for the code below to work.
     new_shape = (2, -1, 256, 256)
-    logger.debug(f"Reshaping selected signals to shape {new_shape}")
+    _logger.debug(f"Reshaping selected signals to shape {new_shape}")
     selection = np.reshape(selection, new_shape)
-    logger.debug(f"Reshaped signal has shape {selection.shape}")
+    _logger.debug(f"Reshaped signal has shape {selection.shape}")
     # for i, s, c in enumerate(zip(selection, coords)):
-    #    logger.debug(f'Verifying that data at location {i} is equal to data at coordinate {c}')
+    #    _logger.debug(f'Verifying that data at location {i} is equal to data at coordinate {c}')
     #    assert s == signal.inav[c[0], c[1]].data, f'Data at coordinate {c} is not equal to the corresponding data in the selection'
     #    assert selection[i] == signal.inav[c[0], c[1]].data, f'Data at location {i} in selected signal should be equal to data at coordinate {c} in signal'
 
-    logger.debug("Creating ElectronDiffraction2D signal from selected patterns...")
+    _logger.debug("Creating ElectronDiffraction2D signal from selected patterns...")
     selection = pxm.signals.ElectronDiffraction2D(selection)
-    logger.debug(f"Cast reshaped signal into hyperspy signal: {selection}")
+    _logger.debug(f"Cast reshaped signal into hyperspy signal: {selection}")
 
-    logger.debug("Adding metadata to selected patterns signal...")
+    _logger.debug("Adding metadata to selected patterns signal...")
     selection.metadata.add_dictionary(signal.metadata.as_dictionary())
     selection.metadata.General.title = "Selected random patterns for template matching"
     selection.metadata.add_dictionary({"Processing": {"Coordinates": coords}})
 
-    logger.debug("Setting axes for selected patterns signal...")
+    _logger.debug("Setting axes for selected patterns signal...")
     for ax in range(
         signal.axes_manager.signal_dimension + signal.axes_manager.navigation_dimension
     ):
@@ -478,7 +478,7 @@ def pick_random(
         selection.axes_manager[ax].scale = signal.axes_manager[ax].scale
         selection.axes_manager[ax].units = signal.axes_manager[ax].units
 
-    logger.debug("Computing selected patterns...")
+    _logger.debug("Computing selected patterns...")
     compute(selection)
 
     return selection
@@ -504,7 +504,7 @@ def make_navigation_mask(
     navigation_mask.metadata.General.title = "Navigation mask"
     if width is None:
         width = 0
-    logger.debug(
+    _logger.debug(
         f"Making navigation mask with a frame width of {width} pixels set to True"
     )
     navigation_mask.inav[width:-width, width:-width] = True
@@ -543,7 +543,7 @@ def center_direct_beam(
         "method", None
     )  # Remove any `method` as it is not compatible with the shifts we will specify later on.
 
-    logger.debug(f"Calculating maximum through-stack before centering")
+    _logger.debug(f"Calculating maximum through-stack before centering")
     max_before = signal.max(axis=[0, 1])
     max_before.metadata.General.title = "Before"
     try:
@@ -554,16 +554,18 @@ def center_direct_beam(
     centering_metadata = {}  # Metadata dict for centering parameters
 
     if "shifts" not in kwargs:
-        logger.debug(
+        _logger.debug(
             "No shifts provided to centering algorithm. Will calculate shifts using `center_of_mass`"
         )
         if com_mask is None:
             nx, ny = signal.axes_manager.signal_size
             cx, cy = nx // 2, ny // 2
             com_mask = (cx, cy, 15)
-            logger.debug(f"No mask for COM analysis provided, using default {com_mask}")
+            _logger.debug(
+                f"No mask for COM analysis provided, using default {com_mask}"
+            )
 
-        logger.debug(
+        _logger.debug(
             f"Finding direct beam position through COM analysis within {com_mask}"
         )
         centering_metadata["COM_mask"] = com_mask
@@ -574,25 +576,25 @@ def center_direct_beam(
         except Exception:
             pass
         kwargs["shifts"] = shifts
-        logger.debug(f"Found direct beam positions {shifts}")
+        _logger.debug(f"Found direct beam positions {shifts}")
 
     if estimate_linear_shift:
-        logger.debug(
+        _logger.debug(
             f"Estimating linear shifts with input: {estimate_linear_shifts_kwargs}"
         )
         linear_shift = kwargs["shifts"].get_linear_plane(
             **estimate_linear_shifts_kwargs
         )
         kwargs["shifts"] = linear_shift
-        logger.debug(f"Estimated linear shifts: {linear_shift}")
+        _logger.debug(f"Estimated linear shifts: {linear_shift}")
         centering_metadata["estimate_linear_shift"] = estimate_linear_shifts_kwargs
 
     centering_metadata["Shifts"] = kwargs["shifts"]
-    logger.debug(f"Centering direct beam using arguments: {kwargs}")
+    _logger.debug(f"Centering direct beam using arguments: {kwargs}")
     centered = signal.center_direct_beam(**kwargs)
-    logger.debug(f"Finished centering direct beam")
+    _logger.debug(f"Finished centering direct beam")
 
-    logger.debug(f"Calculating maximum through-stack after centering")
+    _logger.debug(f"Calculating maximum through-stack after centering")
     max_after = centered.max(axis=[0, 1])
     max_after.metadata.General.title = "After"
 
@@ -614,7 +616,7 @@ def center_direct_beam(
             [max_before, max_after], overlay=True, alphas=[1, 0.75], colors=["w", "r"]
         )
 
-    logger.debug(
+    _logger.debug(
         f"Finished centering direct beam. Centering metadata:\n{centered.metadata.Preprocessing.Centering}"
     )
 
@@ -645,40 +647,40 @@ def set_calibrations(
     :rtype: None
     """
     if x is None and y is None:
-        logger.warn("No scan calibrations provided!")
+        _logger.warn("No scan calibrations provided!")
     else:
         if x is None:
-            logger.wawarning(
+            _logger.wawarning(
                 f"No scan calibration in x-axis provided, using calibration for y-axis = {x}"
             )
             x = y
         elif y is None:
-            logger.warning(
+            _logger.warning(
                 f"No scan calibration in y-axis provided, using calibration for x-axis = {y}"
             )
             y = x
-        logger.info(f"Setting scan step size calibrations:\n\tx={x}\n\ty={y}")
+        _logger.info(f"Setting scan step size calibrations:\n\tx={x}\n\ty={y}")
         signal.set_scan_calibration(x)
         signal.axes_manager["y"].scale = y
 
     if kx is None and ky is None:
-        logger.warn("No diffraction calibrations provided!")
+        _logger.warn("No diffraction calibrations provided!")
     else:
         if kx is None:
-            logger.warning(
+            _logger.warning(
                 f"No diffraction calibration in x-axis provided, using calibration for y-axis = {ky}"
             )
             kx = ky
         elif ky is None:
-            logger.warning(
+            _logger.warning(
                 f"No diffraction calibration in y-axis provided, using calibration for x-axis = {kx}"
             )
             ky = kx
-        logger.info(f"Setting diffraction calibrations:\n\tkx={kx}\n\tky={ky}")
+        _logger.info(f"Setting diffraction calibrations:\n\tkx={kx}\n\tky={ky}")
         signal.set_diffraction_calibration(kx)
         signal.axes_manager["ky"].scale = ky
 
-    logger.info(f"Calibrated axes manager:\n{signal.axes_manager}")
+    _logger.info(f"Calibrated axes manager:\n{signal.axes_manager}")
 
 
 def make_navigation_mask(
@@ -701,7 +703,7 @@ def make_navigation_mask(
     navigation_mask.metadata.General.title = "Navigation mask"
     if width is None:
         width = 0
-    logger.debug(
+    _logger.debug(
         f"Making navigation mask with a frame width of {width} pixels set to True"
     )
     navigation_mask.inav[width:-width, width:-width] = True
@@ -740,7 +742,7 @@ def center_direct_beam(
         "method", None
     )  # Remove any `method` as it is not compatible with the shifts we will specify later on.
 
-    logger.debug(f"Calculating maximum through-stack before centering")
+    _logger.debug(f"Calculating maximum through-stack before centering")
     max_before = signal.max(axis=[0, 1])
     max_before.metadata.General.title = "Before"
     try:
@@ -751,16 +753,18 @@ def center_direct_beam(
     centering_metadata = {}  # Metadata dict for centering parameters
 
     if "shifts" not in kwargs:
-        logger.debug(
+        _logger.debug(
             "No shifts provided to centering algorithm. Will calculate shifts using `center_of_mass`"
         )
         if com_mask is None:
             nx, ny = signal.axes_manager.signal_size
             cx, cy = nx // 2, ny // 2
             com_mask = (cx, cy, 15)
-            logger.debug(f"No mask for COM analysis provided, using default {com_mask}")
+            _logger.debug(
+                f"No mask for COM analysis provided, using default {com_mask}"
+            )
 
-        logger.debug(
+        _logger.debug(
             f"Finding direct beam position through COM analysis within {com_mask}"
         )
         centering_metadata["COM_mask"] = com_mask
@@ -771,25 +775,25 @@ def center_direct_beam(
         except Exception:
             pass
         kwargs["shifts"] = shifts
-        logger.debug(f"Found direct beam positions {shifts}")
+        _logger.debug(f"Found direct beam positions {shifts}")
 
     if estimate_linear_shift:
-        logger.debug(
+        _logger.debug(
             f"Estimating linear shifts with input: {estimate_linear_shifts_kwargs}"
         )
         linear_shift = kwargs["shifts"].get_linear_plane(
             **estimate_linear_shifts_kwargs
         )
         kwargs["shifts"] = linear_shift
-        logger.debug(f"Estimated linear shifts: {linear_shift}")
+        _logger.debug(f"Estimated linear shifts: {linear_shift}")
         centering_metadata["estimate_linear_shift"] = estimate_linear_shifts_kwargs
 
     centering_metadata["Shifts"] = kwargs["shifts"]
-    logger.debug(f"Centering direct beam using arguments: {kwargs}")
+    _logger.debug(f"Centering direct beam using arguments: {kwargs}")
     centered = signal.center_direct_beam(**kwargs)
-    logger.debug(f"Finished centering direct beam")
+    _logger.debug(f"Finished centering direct beam")
 
-    logger.debug(f"Calculating maximum through-stack after centering")
+    _logger.debug(f"Calculating maximum through-stack after centering")
     max_after = centered.max(axis=[0, 1])
     max_after.metadata.General.title = "After"
 
@@ -811,7 +815,7 @@ def center_direct_beam(
             [max_before, max_after], overlay=True, alphas=[1, 0.75], colors=["w", "r"]
         )
 
-    logger.debug(
+    _logger.debug(
         f"Finished centering direct beam. Centering metadata:\n{centered.metadata.Preprocessing.Centering}"
     )
 
@@ -842,40 +846,40 @@ def set_calibrations(
     :rtype: None
     """
     if x is None and y is None:
-        logger.warn("No scan calibrations provided!")
+        _logger.warn("No scan calibrations provided!")
     else:
         if x is None:
-            logger.warn(
+            _logger.warn(
                 f"No scan calibration in x-axis provided, using calibration for y-axis = {x}"
             )
             x = y
         elif y is None:
-            logger.warn(
+            _logger.warn(
                 f"No scan calibration in y-axis provided, using calibration for x-axis = {y}"
             )
             y = x
-        logger.info(f"Setting scan step size calibrations:\n\tx={x}\n\ty={y}")
+        _logger.info(f"Setting scan step size calibrations:\n\tx={x}\n\ty={y}")
         signal.set_scan_calibration(x)
         signal.axes_manager["y"].scale = y
 
     if kx is None and ky is None:
-        logger.warn("No diffraction calibrations provided!")
+        _logger.warn("No diffraction calibrations provided!")
     else:
         if kx is None:
-            logger.warn(
+            _logger.warn(
                 f"No diffraction calibration in x-axis provided, using calibration for y-axis = {ky}"
             )
             kx = ky
         elif ky is None:
-            logger.warn(
+            _logger.warn(
                 f"No diffraction calibration in y-axis provided, using calibration for x-axis = {kx}"
             )
             ky = kx
-        logger.info(f"Setting diffraction calibrations:\n\tkx={kx}\n\tky={ky}")
+        _logger.info(f"Setting diffraction calibrations:\n\tkx={kx}\n\tky={ky}")
         signal.set_diffraction_calibration(kx)
         signal.axes_manager["ky"].scale = ky
 
-    logger.info(f"Calibrated axes manager:\n{signal.axes_manager}")
+    _logger.info(f"Calibrated axes manager:\n{signal.axes_manager}")
 
 
 def get_files_in_directory(
@@ -969,7 +973,7 @@ def reorder_dimensions(array: np.ndarray, dimensions: List) -> np.ndarray:
 
 
 def unravel_dictionary(dictionary, *args, rtype=None):
-    logger.debug(
+    _logger.debug(
         f"Unravelling dictionary with keys {list(dictionary.keys())} with args {args} and rtype {rtype}"
     )
     if len(args) == 0:
@@ -978,7 +982,7 @@ def unravel_dictionary(dictionary, *args, rtype=None):
         value = dictionary.get(args[0], None)
 
         if value is None:
-            logger.warning(
+            _logger.warning(
                 f"Value extracted for key {args[0]} is {value} of type {type(value)} from dictionary {dictionary} with keys {list(dictionary.keys())}"
             )
 

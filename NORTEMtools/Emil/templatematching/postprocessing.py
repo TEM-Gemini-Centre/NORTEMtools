@@ -2,8 +2,8 @@
 This module contains tools to postprocess templatematching results.
 """
 
-from NORTEMtools.Emil.utils import MyPath, frame_string
-from NORTEMtools import logger
+from NORTEMtools import _logger
+import NORTEMtools.Emil.utils as _emutils
 from typing import Union, Dict
 import pandas as pd
 import pyxem as pxm
@@ -76,7 +76,7 @@ def save_pixel_results(
     signal: pxm.signals.ElectronDiffraction2D,
     plot_kwargs: Union[None, Dict] = None,
     vector_kwargs: Union[None, Dict] = None,
-    output_dir: Union[None, MyPath] = None,
+    output_dir: Union[None, _emutils.MyPath] = None,
     dpi: int = 300,
     max_pixels: int = 50,
     label: Union[None, str] = None,
@@ -95,7 +95,7 @@ def save_pixel_results(
     :param vector_kwargs: The keyword arguments passed to `result.to_single_phase_markers()`. Default values are {_default_vector_kwargs!r}.
     :type vector_kwargs: Union[None, Dict]
     :param output_dir: The directory to save the pixel results.
-    :type output_dir: Union[None, MyPath]
+    :type output_dir: Union[None, _emutils.MyPath]
     :param dpi: The DPI of the plots to be saved.
     :type dpi: int
     :param max_pixels: The maximum number of pixels to generate plots for.
@@ -125,9 +125,9 @@ def save_pixel_results(
     ]
 
     if output_dir is None:
-        output_dir = MyPath(".")
+        output_dir = _emutils.MyPath(".")
     else:
-        output_dir = MyPath(output_dir)
+        output_dir = _emutils.MyPath(output_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -136,7 +136,7 @@ def save_pixel_results(
     else:
         label = f"_{label}"
 
-    logger.debug(
+    _logger.debug(
         f"Plotting results over signal with following parameters:\n\tvector_kwargs: {vector_kwargs!r}\n\tplot_kwargs: {plot_kwargs!r}"
     )
     result.plot_over_signal(
@@ -146,7 +146,7 @@ def save_pixel_results(
         **plot_kwargs,
     )
 
-    logger.debug("Iterating through plots to save individual pixel results")
+    _logger.debug("Iterating through plots to save individual pixel results")
     signal_fig = plt.gcf()
     navigator_fig = plt.figure(signal_fig.number - 1)
 
@@ -154,13 +154,13 @@ def save_pixel_results(
     for i in range(signal.axes_manager.navigation_shape[0]):
         for j in range(signal.axes_manager.navigation_shape[1]):
             if counter >= max_pixels:
-                logger.info(
+                _logger.info(
                     f"Maximum number of images ({max_pixels}) generated. To generate more images, please increase the `max_pixels` parameter"
                 )
                 return signal_fig, navigator_fig
 
             output_path = output_dir / f"{i}_{j}.png"
-            logger.debug(
+            _logger.debug(
                 f'Changing indices to ({i}, {j}) and saving plots to "{output_path}"'
             )
             signal.axes_manager.indices = (i, j)
@@ -187,26 +187,26 @@ def result2DataFrame(
     :return: A DataFrame containing the template matching results for every pixel in the 4DSTEM data.
     :rtype: pd.DataFrame
     """
-    logger.debug("Converting result dictionary to DataFrame...")
+    _logger.debug("Converting result dictionary to DataFrame...")
 
     coords = (
         signal.metadata.as_dictionary().get("Processing", {}).get("Coordinates", None)
     )
     if coords is None:
-        logger.warning(
+        _logger.warning(
             "No coordinates found in signal metadata; proceeding without position information."
         )
     else:
-        logger.debug(f"Using coordinates from metadata: {coords!s}")
+        _logger.debug(f"Using coordinates from metadata: {coords!s}")
         order = "F"
         navigation_shape = signal.axes_manager.navigation_shape
         coords_array = np.array(coords)
-        logger.debug(
+        _logger.debug(
             f'Reshaping coordinate array {coords_array}:\nnavigation shape: {navigation_shape}\norder: "{order}"'
         )
         xs = coords_array[:, 0].reshape(navigation_shape, order=order)
         ys = coords_array[:, 1].reshape(navigation_shape, order=order)
-        logger.debug(f"xs={xs}\nys={ys}")
+        _logger.debug(f"xs={xs}\nys={ys}")
 
     results = pd.DataFrame()
     for i in range(result.axes_manager[0].size):
@@ -231,17 +231,17 @@ def result2DataFrame(
             df["Pixels"] = pixels
 
             results = pd.concat([results, df], ignore_index=True)
-            logger.debug(
+            _logger.debug(
                 f"Dataframe for location {location} = {position} (pixels {pixels}):\n{str(df)}"
             )
 
-    logger.debug(f"Result DataFrame:\n{results.to_string()}")
+    _logger.debug(f"Result DataFrame:\n{results.to_string()}")
     return results
 
 
 def summarize_results(
     results: pd.DataFrame,
-    output_path: MyPath,
+    output_path: _emutils.MyPath,
     groupby_column: str = "Pixels",
     title: str = "",
 ) -> pd.DataFrame:
@@ -251,17 +251,17 @@ def summarize_results(
     :param results: The DataFrame containing calibration test results.
     :type results: pd.DataFrame
     :param output_path: Path to save the summary plot.
-    :type output_path: MyPath
+    :type output_path: _emutils.MyPath
     :param title: Title for the summary plot.
     :type title: str
     :return: A DataFrame containing summary statistics of the best calibrations.
     :rtype: DataFrame
     """
     try:
-        logger.debug(f'Grouping dataframe by column "{groupby_column}"...')
+        _logger.debug(f'Grouping dataframe by column "{groupby_column}"...')
         group = results.groupby(groupby_column)
     except Exception as e:
-        logger.error(
+        _logger.error(
             f'Cannot summarize results due to error when grouping dataframe by column "{groupby_column}": {e}.\nDataframe is:\n{results.head()}\nSkipping summary and returning an empty dataframe with matching columns'
         )
         return pd.DataFrame(columns=results.columns)
@@ -281,8 +281,8 @@ def summarize_results(
         best_calibrations.to_csv(f, index=False)
 
     # Print best calibrations
-    logger.info(
-        f"{frame_string('Best Calibrations for Each Position')}\n"
+    _logger.info(
+        f"{_emutils.frame_string('Best Calibrations for Each Position')}\n"
         f"{best_calibrations.to_string()}"
     )
 
@@ -299,14 +299,14 @@ def summarize_results(
     )
 
     # Print summary
-    logger.info(
-        f"{frame_string('Calibration Summary Statistics')}\n"
+    _logger.info(
+        f"{_emutils.frame_string('Calibration Summary Statistics')}\n"
         "Statistics computed over best calibrations for each position:\n"
         f"{summary.to_string()}"
     )
 
     # Generate summary plot
-    logger.debug("Generating summary plot...")
+    _logger.debug("Generating summary plot...")
     plt.figure()
     x = np.arange(len(best_calibrations_array))
     sb.set_style("ticks")

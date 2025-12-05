@@ -1,4 +1,4 @@
-from NORTEMtools import logger, add_log_handler, remove_log_handler
+from NORTEMtools import _logger, add_log_handler, remove_log_handler
 
 from NORTEMtools.Emil.utils import (
     MyPath,
@@ -63,7 +63,7 @@ def test_calibration(
     :rtype: pd.DataFrame
     """
 
-    logger.debug("Starting calibration test...")
+    _logger.debug("Starting calibration test...")
     results = pd.DataFrame()  # Placeholder for actual results
 
     hs.set_log_level("ERROR")  # Suppress hyperspy logs during calibration test
@@ -72,21 +72,21 @@ def test_calibration(
         signal.axes_manager[-1].scale * start,
         signal.axes_manager[-1].scale * end,
     )
-    logger.info(
+    _logger.info(
         f"Testing calibrations from {cal_min:.3e} to {cal_max:.3e} with {n} points."
     )
 
     cal = np.linspace(cal_min, cal_max, num=n)
-    logger.debug(f"Calibration values to test: {cal!s}")
+    _logger.debug(f"Calibration values to test: {cal!s}")
 
     if npt is None:
         nx, ny = signal.axes_manager.signal_shape
         npt = int(np.sqrt((nx / 2) ** 2 + (ny / 2) ** 2))
-        logger.debug(
+        _logger.debug(
             f"Number of points for radial integration not provided; using half-diagonal of pattern: npt={npt}"
         )
     else:
-        logger.debug(
+        _logger.debug(
             f"Using provided number of points for radial integration: npt={npt}"
         )
 
@@ -94,17 +94,17 @@ def test_calibration(
     tic = time.time()
     for i, c in enumerate(cal):
         # Log calibration being tested
-        logger.info(frame_string(f"Calibration test {i+1}/{n}: calibration = {c:.4e}"))
+        _logger.info(frame_string(f"Calibration test {i+1}/{n}: calibration = {c:.4e}"))
 
-        logger.debug(f"Setting diffraction calibration to {c:.4e}...")
+        _logger.debug(f"Setting diffraction calibration to {c:.4e}...")
         signal.set_diffraction_calibration(c)
 
-        logger.debug("Performing radial integration of the signal...")
+        _logger.debug("Performing radial integration of the signal...")
         radial_integration = signal.get_azimuthal_integral2d(
             npt=npt, show_progressbar=False
         )  # , radial_range=(0.066, reciprocal_radius))
         if intensity_transform_function is not None:
-            logger.debug(
+            _logger.debug(
                 "Applying intensity transformation function to radial integration..."
             )
             radial_integration.map(
@@ -114,7 +114,7 @@ def test_calibration(
             )
         compute(radial_integration)
 
-        logger.debug("Getting orientation using template matching...")
+        _logger.debug("Getting orientation using template matching...")
         res = radial_integration.get_orientation(
             simulations,
             n_best=simulations.rotations.size,
@@ -140,22 +140,22 @@ def test_calibration(
                 label=f"{i}",
             )
 
-        logger.debug("Creating DataFrame from template matching result...")
+        _logger.debug("Creating DataFrame from template matching result...")
         df = result2DataFrame(res, signal)
 
-        logger.debug("Appending results to overall DataFrame...")
+        _logger.debug("Appending results to overall DataFrame...")
         results = pd.concat([results, df], ignore_index=True)
     toc = time.time()
     elapsed = toc - tic
-    logger.info(
+    _logger.info(
         f"Calibration test completed in {elapsed:.2f} seconds.\nTime per calibration: {elapsed/n:.2f} seconds."
     )
 
     hs.set_log_level(logger.level)  # Restore previous hyperspy log level
 
-    logger.debug("Calibration test completed.")
+    _logger.debug("Calibration test completed.")
 
-    logger.debug(f"Results DataFrame:\n{results.to_string()}")
+    _logger.debug(f"Results DataFrame:\n{results.to_string()}")
 
     return results
 
@@ -253,7 +253,7 @@ def main():
     )
     args = parser.parse_args()
     set_log_level(logger, args.verbosity)
-    logger.debug(f"Logger level = {logger.level}")
+    _logger.debug(f"Logger level = {logger.level}")
 
     # Get the input path of the data file. Log files will be saved in the same directory.
     input_path = MyPath(args.input_file)
@@ -285,7 +285,7 @@ def main():
     parser_description += "\n".join(
         [f"{arg}: {getattr(args, arg)}" for arg in vars(args)]
     )
-    logger.info(f"Parser description:\n{parser_description}")
+    _logger.info(f"Parser description:\n{parser_description}")
 
     # Write parser arguments to json file in output directory for record keeping
     args_path = output_dir / "arguments.json"
@@ -295,7 +295,7 @@ def main():
     # Set up paths
     if args.template_file is None:
         template_path = input_path.append("template", "pkl")
-        logger.debug(f"No template file provided; using default: {template_path}")
+        _logger.debug(f"No template file provided; using default: {template_path}")
     else:
         template_path = MyPath(args.template_file)
 
@@ -305,14 +305,14 @@ def main():
     # Set initial guess for calibration if provided
     if args.guess is not None:
         signal.set_diffraction_calibration(args.guess)
-        logger.debug(f"Setting initial guess for calibration to {args.guess:.4e}")
+        _logger.debug(f"Setting initial guess for calibration to {args.guess:.4e}")
 
     # Load template
-    logger.info(f"Loading template from {template_path}")
+    _logger.info(f"Loading template from {template_path}")
     template = load_template(template_path)
 
     # Pick random coordinates
-    logger.info(f"Picking {args.n_random} random coordinates from data for analysis")
+    _logger.info(f"Picking {args.n_random} random coordinates from data for analysis")
     random_signal = pick_random(
         signal,
         n=args.n_random,
@@ -321,11 +321,11 @@ def main():
         output_path=output_dir / "vbf_coordinates.png",
     )
     out_signal_path = output_dir / "selected.hspy"
-    logger.info(f'Saving selected signal to "{out_signal_path}"')
+    _logger.info(f'Saving selected signal to "{out_signal_path}"')
     random_signal.save(out_signal_path, overwrite=True)
 
     # Perform calibration check
-    logger.info("Performing calibration check...")
+    _logger.info("Performing calibration check...")
     results = test_calibration(
         random_signal,
         template,
@@ -338,22 +338,22 @@ def main():
         save_pixels=args.show_results,
         max_pixels=args.max_pixels,
     )
-    logger.info("Calibration check completed.")
+    _logger.info("Calibration check completed.")
 
     # Save results
-    logger.info(f"Saving results to {output_dir}")
+    _logger.info(f"Saving results to {output_dir}")
     results_path = output_dir / f"calibration_results.csv"
     with open(results_path, "w", encoding="utf-8") as f:
         results.to_csv(f, index=False)
-    logger.info(f"Results saved to {results_path}")
+    _logger.info(f"Results saved to {results_path}")
 
     # Generate and save plot
-    logger.info("Generating calibration plot...")
+    _logger.info("Generating calibration plot...")
     plt.figure()
     try:
         sb.lineplot(data=results, x="Calibration", y="Correlation", hue="Pixels")
     except Exception as e:
-        logger.error(
+        _logger.error(
             f"Failed to generate calibration plot: {e}\nGenerating plot without hue."
         )
         sb.lineplot(data=results, x="Calibration", y="Correlation")
@@ -362,7 +362,7 @@ def main():
     )
     plt.tight_layout()
     plt.savefig(results_path.with_suffix(".png"), dpi=300)
-    logger.info(f'Calibration plot saved to {results_path.with_suffix(".png")}')
+    _logger.info(f'Calibration plot saved to {results_path.with_suffix(".png")}')
     plt.close()
 
     # Summarize results
@@ -376,13 +376,13 @@ def main():
             else "Calibration Summary"
         ),
     )
-    logger.info(f"Summary plot saved to {summary_path}")
+    _logger.info(f"Summary plot saved to {summary_path}")
     summary_csv_path = summary_path.with_suffix(".csv")
     with open(summary_csv_path, "w", encoding="utf-8") as f:
         summary.to_csv(f, index=False)
-    logger.info(f"Summary statistics saved to {summary_csv_path}")
+    _logger.info(f"Summary statistics saved to {summary_csv_path}")
 
-    logger.info("Calibration check process completed successfully.")
+    _logger.info("Calibration check process completed successfully.")
 
     remove_log_handler(output_dir / "log.txt")
     gc.collect()

@@ -1,4 +1,3 @@
-from .utils import *
-from .templatematching import *
-from .scripts import *
-from .jh5 import *
+from . import utils, templatematching, scripts, jh5
+
+__all__ = ["utils", "templatematching", "scripts", "jh5"]

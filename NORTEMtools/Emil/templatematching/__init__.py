@@ -1,12 +1,6 @@
-from .io import save_template, load_template
-from .postprocessing import (
-    result2DataFrame,
-    summarize_results,
-    save_pixel_results,
-    show_results,
-)
-from NORTEMtools import logger
-from NORTEMtools.Emil.utils import MyPath
+from . import io, postprocessing
+import NORTEMtools.Emil.utils as _emutils
+from NORTEMtools import _logger
 
 import matplotlib.pyplot as plt
 from diffpy.structure import loadStructure
@@ -49,19 +43,19 @@ class MyBank:
     ):
         f"""
         Create a new template bank
-        
+
         :param name: Name of the bank
         :param cif_file: The cif file to use for the bank
         :param space_group: The space group of the crystal
         :param angular_resolution: The angular resolution to to use when simulating banks
         :param reciprocal_radius: The maximum reciprocal radius to simulate
         :param generator_kwargs: Keyword arguments to be passed to the generator generation. Default values are {self.__simulation_generator_defaults__}. See `diffsims.generator.simulation_generator.SimulationGenerator` for more information.
-        :param simulation_kwargs: Keyword arguments to be passed to the simulation. Default values are {self.__simulation_defaults__}. See `diffsims.generator.simulation_generator.SimulationGenerator.calculate_diffraction2d()` for more information. 
+        :param simulation_kwargs: Keyword arguments to be passed to the simulation. Default values are {self.__simulation_defaults__}. See `diffsims.generator.simulation_generator.SimulationGenerator.calculate_diffraction2d()` for more information.
         """
 
         self.name = str(name)
         self.space_group = int(space_group)
-        self.cif_file = MyPath(cif_file)
+        self.cif_file = _emutils.MyPath(cif_file)
         self.angular_resolution = float(angular_resolution)
         self.reciprocal_radius = float(reciprocal_radius)
         self.simulation_generator = None
@@ -128,20 +122,12 @@ class MyBank:
         self.simulations.plot(interactive=True)
 
     def save_templates(self, path):
-        path = MyPath(path)
+        path = _emutils.MyPath(path)
         if path.is_dir():
             path = path / self.name
             path = path.with_suffix(".pkl")
         path.parent.mkdir(parents=True, exist_ok=True)
-        save_template(self.simulations, path)
+        io.save_template(self.simulations, path)
 
 
-__all__ = [
-    "load_template",
-    "save_template",
-    "result2DataFrame",
-    "summarize_results",
-    "MyBank",
-    "show_results",
-    "save_pixel_results",
-]
+__all__ = ["io", "postprocessing", "MyBank"]

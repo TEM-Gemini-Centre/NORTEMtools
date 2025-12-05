@@ -1,6 +1,5 @@
 import hyperspy.api as hs
 import pyxem as pxm
-from NORTEMtools.Emil import MyPath
 import numpy as np
 import json
 from pathlib import Path
@@ -10,8 +9,8 @@ import numpy as np
 import tabulate
 from natsort import natsorted
 
-from NORTEMtools.Emil.utils import str2dict, unravel_dictionary
-from NORTEMtools import logger
+import NORTEMtools.Emil.utils as _emutils
+from NORTEMtools import _logger
 
 
 def _convert_bytes_to_str(value):
@@ -165,7 +164,7 @@ class JH5Reader:
 
                     # Convert any byte strings or nested dictionaries in attributes
                     attrs = {
-                        key: str2dict(_convert_bytes_to_str(value))
+                        key: _emutils.str2dict(_convert_bytes_to_str(value))
                         for key, value in attrs.items()
                     }
                     # Store attributes under a special key name (e.g., "dataset_name_attrs")
@@ -337,7 +336,7 @@ class JH5Reader:
                     attrs = dict(dataset.attrs) if len(dataset.attrs) > 0 else {}
                     # Convert attributes, handling potential bytes or nested strings
                     attrs = {
-                        key: str2dict(_convert_bytes_to_str(value))
+                        key: _emutils.str2dict(_convert_bytes_to_str(value))
                         for key, value in attrs.items()
                     }
 
@@ -415,7 +414,7 @@ class JH5Reader:
         try:
             # Check if the dataset exists and has the required metadata structure
 
-            signal_type = unravel_dictionary(
+            signal_type = _emutils.unravel_dictionary(
                 self.get_dataset_info(dataset_path),
                 "attributes",
                 "Metadata",
@@ -426,7 +425,7 @@ class JH5Reader:
 
         except Exception as e:
             # Log error if anything fails during the lookup process
-            logger.error(
+            _logger.error(
                 f'Could not get hyperspy signal type from data object "{dataset_path}" due to error {e}'
             )
             hyperspy_signal_type = None
@@ -436,7 +435,7 @@ class JH5Reader:
     def _get_calibration(self, dataset_path: str) -> List:
 
         try:
-            return unravel_dictionary(
+            return _emutils.unravel_dictionary(
                 self.get_dataset_info(dataset_path),
                 "attributes",
                 "OptionalData",
@@ -446,14 +445,14 @@ class JH5Reader:
                 rtype=list,
             )
         except Exception as e:
-            logger.error(
+            _logger.error(
                 f'Could not get calibration for data object "{dataset_path}" due to error {e}.'
             )
             return {}
 
     def _get_dimension_length(self, dataset_path: str) -> int:
         try:
-            return unravel_dictionary(
+            return _emutils.unravel_dictionary(
                 self.get_dataset_info(dataset_path),
                 "attributes",
                 "OptionalData",
@@ -463,14 +462,14 @@ class JH5Reader:
                 rtype=int,
             )
         except Exception as e:
-            logger.error(
+            _logger.error(
                 f'Could not get dimensions for data object "{dataset_path}" due to error {e}'
             )
             return None
 
     def _get_dimensions(self, dataset_path: str) -> list:
         try:
-            return unravel_dictionary(
+            return _emutils.unravel_dictionary(
                 self.get_dataset_info(dataset_path),
                 "attributes",
                 "OptionalData",
@@ -480,7 +479,7 @@ class JH5Reader:
                 rtype=list,
             )[::-1]
         except Exception as e:
-            logger.error(
+            _logger.error(
                 f'Could not get dimensions for data object "{dataset_path}" due to error {e}'
             )
             return None
@@ -508,7 +507,7 @@ class JH5Reader:
                 axes.append(dict)
 
                 if dict["scale"] > 1.0 and dict["units"] == "keV":
-                    logger.warning(
+                    _logger.warning(
                         f'The scale of {dict["scale"]} {dict["units"]} seems to be too large for the given unit. Maybe this is a FEMTUS bug where the scale is given in KeV should really be given in eV? Consider changing the units when doing analysis!'
                     )
         return axes
@@ -570,7 +569,7 @@ def jh5_to_hspy(
             navigation_axes=navigation_axes, signal_axes=signal_axes
         )
     except Exception as e:
-        logger.error(
+        _logger.error(
             f"Could not transpose signal {signal} of shape {signal.data.shape} using navigation_axes = {navigation_axes} and signal_axes={signal_axes} due to error {e}"
         )
 
@@ -582,20 +581,20 @@ def jh5_to_hspy(
 
 
 def load_jh5(
-    file_path: MyPath, dataset_path="0"
+    file_path: _emutils.MyPath, dataset_path="0"
 ) -> Union[hs.signals.BaseSignal, hs.signals.Signal1D, hs.signals.Signal2D]:
     """Load a jh5 file into a hyperspy signal"""
     reader = JH5Reader(file_path)
     return jh5_to_hspy(reader, dataset_path=dataset_path)
 
 
-def jh5_4DSTEM(file_path: MyPath) -> pxm.signals.ElectronDiffraction2D:
+def jh5_4DSTEM(file_path: _emutils.MyPath) -> pxm.signals.ElectronDiffraction2D:
 
-    file_path = MyPath(
+    file_path = _emutils.MyPath(
         file_path
     )  # Path to 4DSTEM junk data file (but with useful metadata)
 
-    logger.info(f"Loading {file_path} to extract metadata for 4DSTEM stack")
+    _logger.info(f"Loading {file_path} to extract metadata for 4DSTEM stack")
     if file_path.suffix == ".jh5":
         base_signal = load_jh5(
             file_path
@@ -611,15 +610,15 @@ def jh5_4DSTEM(file_path: MyPath) -> pxm.signals.ElectronDiffraction2D:
         tif_directory = (
             file_path.parent / file_path.stem
         )  # Get the path to the 4DSTEM data
-        logger.debug(f'Attempting to load 4DSTEM tif stacks from "{tif_directory}"')
+        _logger.debug(f'Attempting to load 4DSTEM tif stacks from "{tif_directory}"')
         tif_paths = tif_directory.glob("*.tif")  # Get the paths to all the tifs
         tif_paths = natsorted(tif_paths)  # Naturally sort the tifs
-        logger.debug(f"Found {len(tif_paths)} tif files.")
+        _logger.debug(f"Found {len(tif_paths)} tif files.")
 
         signal = hs.load(tif_paths, stack=True)  # Import the tifs as a stack
-        logger.info(f"Loaded 4DSTEM signal with shape {signal.data.shape}.")
+        _logger.info(f"Loaded 4DSTEM signal with shape {signal.data.shape}.")
     except Exception as e:
-        logger.error(
+        _logger.error(
             f'Could not load .tif stacks (found ({len(tif_paths)}) from "{file_path}" due to error {e}.'
         )
         raise
@@ -633,7 +632,7 @@ def jh5_4DSTEM(file_path: MyPath) -> pxm.signals.ElectronDiffraction2D:
     calibrations = base_signal.metadata.OptionalData.Information.MeasurementInformation.CalibrationCoefficients[
         ::-1
     ]  # Remember to reverse the list!
-    logger.warning(
+    _logger.warning(
         f"Using reversed order for the calibrations found in junk .jh5 file. It is probably not correct to reverse it, as it is probably just a matter of rolling the axes, but the result should be ok for equal step sizes and pixel sizes for the navigation and signal spaces."
     )
     for i, cal in enumerate(calibrations):
@@ -680,7 +679,7 @@ def jh5_4DSTEM(file_path: MyPath) -> pxm.signals.ElectronDiffraction2D:
     try:
         experimental_parameters = {
             parameter: round(
-                unravel_dictionary(
+                _emutils.unravel_dictionary(
                     base_signal.metadata.as_dictionary(), *metadata_mapping[parameter]
                 ),
                 2,
@@ -689,19 +688,19 @@ def jh5_4DSTEM(file_path: MyPath) -> pxm.signals.ElectronDiffraction2D:
         }
         signal.set_experimental_parameters(**experimental_parameters)
     except Exception as e:
-        logger.error(
+        _logger.error(
             f"Could not set experimental parameters due to error {e}. Ignoring this for now, but this should probably be checked manually"
         )
 
     signal.metadata.set_dictionary({"JH5_file": base_signal})
-    logger.info(f'Added junk .jh5 file to metadata under key "JH5_file"')
+    _logger.info(f'Added junk .jh5 file to metadata under key "JH5_file"')
 
     return signal
 
 
-def load_JEOL_worksheet(file_path: MyPath) -> Dict:
+def load_JEOL_worksheet(file_path: _emutils.MyPath) -> Dict:
     """Load JEOL worksheet file."""
-    file_path = MyPath(file_path)
+    file_path = _emutils.MyPath(file_path)
     if not file_path.exists():
         raise FileNotFoundError(f'File "{file_path.absolute()} was not found')
     if not file_path.suffix == ".jfw":
@@ -716,25 +715,25 @@ def load_JEOL_worksheet(file_path: MyPath) -> Dict:
     files = [
         file_path.parent / title / element.get("RelativePath") for element in elements
     ]
-    logger.debug(
+    _logger.debug(
         f'Found {len(files)} files for JEOL worksheet {file_path}:\n\t{"\n\t".join([str(file) for file in files])}'
     )
 
     signals = {}
     for file in files:
         if not file.exists():
-            logger.warning(f'File "{file}" in JEOL worksheet {title} does not exist.')
+            _logger.warning(f'File "{file}" in JEOL worksheet {title} does not exist.')
         else:
             try:
                 reader = JH5Reader(file)
                 signals[file] = jh5_to_hspy(reader, "0")
             except Exception as e:
-                logger.error(
+                _logger.error(
                     f"Could not read file {file} with .jh5 filereader due to error {e}"
                 )
 
     table = tabulate.tabulate(
         [[str(key), str(signals[key])] for key in signals], headers=["File", "Signal"]
     )
-    logger.info(f"Loaded files\n{table}")
+    _logger.info(f"Loaded files\n{table}")
     return signals

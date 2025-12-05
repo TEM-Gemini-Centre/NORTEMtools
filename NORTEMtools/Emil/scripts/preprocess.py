@@ -8,7 +8,7 @@ python NORTEMtools/scripts/preprocess.py --help
 
 import argparse
 from zarr import ZipStore
-from NORTEMtools import logger
+from NORTEMtools import _logger
 from NORTEMtools.Emil.utils import (
     MyPath,
     args2string,
@@ -72,19 +72,19 @@ def preprocess(
 
     # Check that data is ElectronDiffraction2D, if not, raise a warning and try to change the signal type
     if not isinstance(signal, pxm.signals.ElectronDiffraction2D):
-        logger.warning(
+        _logger.warning(
             f"Only ElectronDiffraction2D signals can be preprocessed. I got {signal!r} of type {type(signal)}"
         )
         signal.set_signal_type("electron_diffraction")
 
     if isinstance(signal, pxm.signals.LazyElectronDiffraction2D):
-        logger.debug(
+        _logger.debug(
             f"Rechunking data with `nav_chunks={nav_chunks}`, `sig_chunks={sig_chunks}`"
         )
         signal.rechunk(nav_chunks=nav_chunks, sig_chunks=sig_chunks)
 
     # Center data
-    logger.info("Centering dataset")
+    _logger.info("Centering dataset")
     estimate_linear_shift_kwargs = {}
     if estimate_linear_shift:
         estimate_linear_shift_kwargs["mask"] = make_navigation_mask(signal, width)
@@ -101,7 +101,7 @@ def preprocess(
     try:
         metadata = load_metadata_from_json(metadata_file)
     except Exception as e:
-        logger.warning(f"Could not load metadata from json file due to error: {e}")
+        _logger.warning(f"Could not load metadata from json file due to error: {e}")
         metadata = {}
     else:
         set_metadata(signal, metadata)
@@ -117,20 +117,20 @@ def preprocess(
     set_calibrations(signal, x, y, kx, ky)
 
     # Make VBF and maximum through-stack
-    logger.info(f"Preparing VBF")
+    _logger.info(f"Preparing VBF")
     vbf = signal.get_integrated_intensity(
         hs.roi.CircleROI(cx=0.0, cy=0.0, r_inner=0.0, r=0.07)
     )
     compute(vbf)
     signal.metadata.add_dictionary({"Preprocessing": {"VBF": vbf}})
 
-    logger.info("Preparing maximum through-stack")
+    _logger.info("Preparing maximum through-stack")
     maximums = signal.max(axis=[0, 1])
     compute(maximums)
     signal.metadata.add_dictionary({"Preprocessing": {"Maximums": maximums}})
 
     # Save the VBF and maximums
-    logger.info(f"Saving VBF and maximums as images")
+    _logger.info(f"Saving VBF and maximums as images")
     plt.imsave(filename.with_name(f"{filename.stem}_preprocessed_vbf.png"), vbf.data)
     plt.imsave(
         filename.with_name(f"{filename.stem}_preprocessed_maximums.png"), maximums.data
@@ -230,7 +230,7 @@ def main():
 
     set_log_level(logger, arguments.verbosity)  # Set log level
 
-    logger.debug(args2string(arguments))  # Log the input values
+    _logger.debug(args2string(arguments))  # Log the input values
 
     calibrations = arguments.calibrations
     if calibrations is None:
@@ -243,7 +243,7 @@ def main():
             "ky": calibrations[3],
         }
 
-    logger.debug(
+    _logger.debug(
         f"I will save preprocessed signals in these formats: {arguments.formats}"
     )
 
@@ -263,24 +263,26 @@ def main():
         preprocessed_filename = arguments.filename.with_name(
             f"{arguments.filename.stem}_preprocessed{f}"
         )
-        logger.info(f'Saving preprocessed data to "{preprocessed_filename.absolute()}"')
+        _logger.info(
+            f'Saving preprocessed data to "{preprocessed_filename.absolute()}"'
+        )
         chunks = (arguments.chunks[0],) * signal.axes_manager.navigation_dimension + (
             arguments.chunks[1],
         ) * signal.axes_manager.signal_dimension
         try:
             if f == ".zspy":
-                logger.info(f"Saving data as a ZipStore with chunks: {chunks}")
+                _logger.info(f"Saving data as a ZipStore with chunks: {chunks}")
                 store = ZipStore(preprocessed_filename)
                 signal.save(store, overwrite=arguments.overwrite, chunks=chunks)
             elif f in [".hspy", ".hdf5"]:
-                logger.info(f"Saving data with chunks: {chunks}")
+                _logger.info(f"Saving data with chunks: {chunks}")
                 signal.save(
                     preprocessed_filename, overwrite=arguments.overwrite, chunks=chunks
                 )
             else:
                 signal.save(preprocessed_filename, overwrite=arguments.overwrite)
         except Exception as e:
-            logger.error(
+            _logger.error(
                 f"Exception when saving preprocessed signal with format {f}: \n{e}. \nSkipping format and continuing."
             )
 

@@ -21,13 +21,13 @@ def make_logger(log_file: str = "log.txt", formatter=None) -> logging.Logger:
         formatter (Union[None, str], optional): The log message format. Defaults to None which will use a detailed format: "{__default_fmt__}".
         
     Returns:
-        logging.Logger: Configured logger instance.
+        logging.logger: Configured logger instance.
     
     """
 
-    logger = logging.getLogger(__file__)
-    logger.propagate = False
-    logger.setLevel(logging.INFO)
+    _logger = logging.getLogger(__file__)
+    _logger.propagate = False
+    _logger.setLevel(logging.INFO)
 
     # Set default formatter
     if formatter is None:
@@ -39,41 +39,41 @@ def make_logger(log_file: str = "log.txt", formatter=None) -> logging.Logger:
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
-    logger.addHandler(ch)
+    _logger.addHandler(ch)
 
     # Add file handler
     fh = logging.FileHandler(log_file, "a+", encoding="utf-8")
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
-    logger.addHandler(fh)
+    _logger.addHandler(fh)
 
-    return logger
-
-
-logger = make_logger()
+    return _logger
 
 
-def add_log_handler(logfile: str, logger: logging.Logger = logger):
+_logger = make_logger()
+
+
+def add_log_handler(logfile: str, logger: logging.Logger = _logger):
     """
-    Add a file handler to the logger
+    Add a file handler to the _logger
 
-    :param logfile: The file to add to the logger
+    :param logfile: The file to add to the _logger
     :type logfile: str
     :param logger: The logger to add the file to
     :type logger: logging.Logger
     """
 
     fh = logging.FileHandler(logfile, "a+", encoding="utf-8")
-    fh.setLevel(logger.level)
-    for handler in logger.handlers:
+    fh.setLevel(_logger.level)
+    for handler in _logger.handlers:
         if isinstance(handler, logging.FileHandler):
             fh.setFormatter(handler.formatter)
             break
-    logger.debug(f'Adding file handler to stream "{Path(fh.stream.name).absolute()}"')
-    logger.addHandler(fh)
+    _logger.debug(f'Adding file handler to stream "{Path(fh.stream.name).absolute()}"')
+    _logger.addHandler(fh)
 
 
-def remove_log_handler(logfile: str, logger: logging.Logger = logger):
+def remove_log_handler(logfile: str, logger: logging.Logger = _logger):
     """
     Docstring for remove_log_handler
 
@@ -83,17 +83,17 @@ def remove_log_handler(logfile: str, logger: logging.Logger = logger):
     :type logger: logging.Logger
     """
     logfile = Path(logfile).absolute()
-    for handler in logger.handlers:
+    for handler in _logger.handlers:
         if isinstance(handler, logging.FileHandler):
             stream_path = Path(handler.stream.name)
             if stream_path == logfile:
-                logger.debug(f'Removing file handler to stream "{stream_path}"')
+                _logger.debug(f'Removing file handler to stream "{stream_path}"')
                 handler.close()
-                logger.removeHandler(handler)
+                _logger.removeHandler(handler)
 
 
 # Submodule imports
-from . import Emil
-from . import Example
+from NORTEMtools import Emil
+from NORTEMtools import Example
 
-logger.debug(f"Loaded NORTEMtools module")
+_logger.debug(f"Loaded NORTEMtools module")
