@@ -19,6 +19,7 @@ import argparse
 import logging
 import itertools
 
+
 Signal = Union[pxm.signals.ElectronDiffraction2D, pxm.signals.LazyDiffraction2D]
 
 
@@ -246,7 +247,9 @@ def load(path: MyPath, *args, **kwargs) -> Signal:
     """
     path = MyPath(path)
     log_with_header("Loading data", f'Loading data from "{path}"')
+    _logger.debug(f'Loading data from path "{path}"')
     if path.suffix.lower() == ".zspy":
+        _logger.debug(f"Loading .zspy data")
         try:
             _logger.debug("Detected .zspy file; loading using NestedDirectoryStore.")
             store = NestedDirectoryStore(str(path))

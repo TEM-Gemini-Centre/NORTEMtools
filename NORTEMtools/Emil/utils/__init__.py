@@ -22,7 +22,7 @@ from .utils import (
     reorder_dimensions,
     unravel_dictionary,
     str2dict,
-    Signal
+    Signal,
 )
 
 __all__ = [
@@ -52,5 +52,5 @@ __all__ = [
     "reorder_dimensions",
     "unravel_dictionary",
     "str2dict",
-    
+    "Signal",
 ]
