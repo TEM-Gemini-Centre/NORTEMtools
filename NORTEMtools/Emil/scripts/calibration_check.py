@@ -1,7 +1,21 @@
-from NORTEMtools import logger
-from NORTEMtools.Emil.utils import MyPath, compute, frame_string, log_shift, pick_random, Signal, load
+from NORTEMtools import _logger, add_log_handler, remove_log_handler
+
+from NORTEMtools.Emil.utils import (
+    MyPath,
+    compute,
+    frame_string,
+    log_shift,
+    pick_random,
+    Signal,
+    load,
+    set_log_level,
+)
 from NORTEMtools.Emil.templatematching.io import load_template
-from NORTEMtools.Emil.templatematching.postprocessing import result2DataFrame, summarize_results
+from NORTEMtools.Emil.templatematching.postprocessing import (
+    result2DataFrame,
+    summarize_results,
+    save_pixel_results,
+)
 
 import numpy as np
 from typing import Union, Callable
@@ -15,11 +29,22 @@ import gc
 import datetime as dt
 import json
 
-def test_calibration(signal: Signal, simulations: object, start: float, end: float, n: int, intensity_transform_function: Union[None, Callable] = None, npt: Union[None, int] = None) -> pd.DataFrame:
 
+def test_calibration(
+    signal: Signal,
+    simulations: object,
+    start: float,
+    end: float,
+    n: int,
+    intensity_transform_function: Union[None, Callable] = None,
+    npt: Union[None, int] = None,
+    out_image_dir: Union[None, MyPath] = None,
+    save_pixels: bool = False,
+    max_pixels: int = 50,
+) -> pd.DataFrame:
     """
     Test calibration of a 4DSTEM signal using template matching over a range of calibration factors.
-    
+
     :param signal: The input 4DSTEM signal to test calibration on.
     :type signal: Signal
     :param simulations: The simulated templates to use for matching.
@@ -38,165 +63,330 @@ def test_calibration(signal: Signal, simulations: object, start: float, end: flo
     :rtype: pd.DataFrame
     """
 
-    logger.debug('Starting calibration test...')
+    _logger.debug("Starting calibration test...")
     results = pd.DataFrame()  # Placeholder for actual results
 
-    hs.set_log_level('ERROR') # Suppress hyperspy logs during calibration test
+    hs.set_log_level("ERROR")  # Suppress hyperspy logs during calibration test
 
-    cal_min, cal_max = signal.axes_manager[-1].scale*start, signal.axes_manager[-1].scale*end
-    logger.info(f'Testing calibrations from {cal_min:.3e} to {cal_max:.3e} with {n} points.')
+    cal_min, cal_max = (
+        signal.axes_manager[-1].scale * start,
+        signal.axes_manager[-1].scale * end,
+    )
+    _logger.info(
+        f"Testing calibrations from {cal_min:.3e} to {cal_max:.3e} with {n} points."
+    )
 
     cal = np.linspace(cal_min, cal_max, num=n)
-    logger.debug(f'Calibration values to test: {cal!s}')
+    _logger.debug(f"Calibration values to test: {cal!s}")
 
     if npt is None:
         nx, ny = signal.axes_manager.signal_shape
-        npt = int(np.sqrt((nx/2)**2 + (ny/2)**2))
-        logger.debug(f'Number of points for radial integration not provided; using half-diagonal of pattern: npt={npt}')
+        npt = int(np.sqrt((nx / 2) ** 2 + (ny / 2) ** 2))
+        _logger.debug(
+            f"Number of points for radial integration not provided; using half-diagonal of pattern: npt={npt}"
+        )
     else:
-        logger.debug(f'Using provided number of points for radial integration: npt={npt}')
+        _logger.debug(
+            f"Using provided number of points for radial integration: npt={npt}"
+        )
 
-    results=pd.DataFrame()
+    results = pd.DataFrame()
     tic = time.time()
     for i, c in enumerate(cal):
         # Log calibration being tested
-        logger.info(frame_string(f'Calibration test {i+1}/{n}: calibration = {c:.4e}'))
-        
-        logger.debug(f'Setting diffraction calibration to {c:.4e}...')
+        _logger.info(frame_string(f"Calibration test {i+1}/{n}: calibration = {c:.4e}"))
+
+        _logger.debug(f"Setting diffraction calibration to {c:.4e}...")
         signal.set_diffraction_calibration(c)
 
-        logger.debug('Performing radial integration of the signal...')
-        radial_integration = signal.get_azimuthal_integral2d(npt=npt, show_progressbar=False)#, radial_range=(0.066, reciprocal_radius))
+        _logger.debug("Performing radial integration of the signal...")
+        radial_integration = signal.get_azimuthal_integral2d(
+            npt=npt, show_progressbar=False
+        )  # , radial_range=(0.066, reciprocal_radius))
         if intensity_transform_function is not None:
-                logger.debug('Applying intensity transformation function to radial integration...')
-                radial_integration.map(function=intensity_transform_function, inplace=True, show_progressbar=False)
+            _logger.debug(
+                "Applying intensity transformation function to radial integration..."
+            )
+            radial_integration.map(
+                function=intensity_transform_function,
+                inplace=True,
+                show_progressbar=False,
+            )
         compute(radial_integration)
 
-        logger.debug('Getting orientation using template matching...')
-        res = radial_integration.get_orientation(simulations, n_best=simulations.rotations.size, frac_keep=1.0, show_progressbar=False)
+        _logger.debug("Getting orientation using template matching...")
+        res = radial_integration.get_orientation(
+            simulations,
+            n_best=simulations.rotations.size,
+            frac_keep=1.0,
+            show_progressbar=False,
+        )
 
-        logger.debug('Creating DataFrame from template matching result...')
+        if save_pixels:
+            if out_image_dir is None:
+                out_image_dir = MyPath(".")
+            else:
+                out_image_dir = MyPath(out_image_dir)
+
+            out_image_dir = out_image_dir
+
+            out_image_dir.mkdir(parents=True, exist_ok=True)
+
+            save_pixel_results(
+                res,
+                signal,
+                max_pixels=max_pixels,
+                output_dir=out_image_dir,
+                label=f"{i}",
+            )
+
+        _logger.debug("Creating DataFrame from template matching result...")
         df = result2DataFrame(res, signal)
 
-        logger.debug('Appending results to overall DataFrame...')
+        _logger.debug("Appending results to overall DataFrame...")
         results = pd.concat([results, df], ignore_index=True)
     toc = time.time()
     elapsed = toc - tic
-    logger.info(f'Calibration test completed in {elapsed:.2f} seconds.\nTime per calibration: {elapsed/n:.2f} seconds.')
+    _logger.info(
+        f"Calibration test completed in {elapsed:.2f} seconds.\nTime per calibration: {elapsed/n:.2f} seconds."
+    )
 
-    hs.set_log_level(logger.level) # Restore previous hyperspy log level
+    hs.set_log_level(logger.level)  # Restore previous hyperspy log level
 
-    logger.debug('Calibration test completed.')
+    _logger.debug("Calibration test completed.")
 
-    logger.debug(f'Results DataFrame:\n{results.to_string()}')
+    _logger.debug(f"Results DataFrame:\n{results.to_string()}")
 
     return results
 
-def main():
-    parser = argparse.ArgumentParser(description='Calibration check for 4DSTEM data using template matching.')
-    parser.add_argument('input_file', type=str, help='Path to the input 4DSTEM data file')
-    parser.add_argument('--template_file', type=str, default=None, help='Path to the template file for matching. Pickle format. If not provided (default), I will look for a a file with "_template.pkl" appended to the name in same directory as 4DSTEM data file')
-    parser.add_argument('-v', '--verbosity', 
-                        dest='verbosity', 
-                        default=0, 
-                        action='count', 
-                        help='Set verbose level: -v for INFO, -vv for DEBUG')
-    parser.add_argument('--output_dir', type=str, default='calibration_output', help='Directory to save output results')
-    parser.add_argument('--n_random', type=int, default=5, help='Number of random coordinates to pick for analysis')
-    parser.add_argument('--seed', type=int, default=197405, help='Random seed for reproducibility')
-    parser.add_argument('--lazy', action='store_true', help='Load data lazily using dask')
-    parser.add_argument('--start', type=float, default=0.9, help='Start of the calibration range. Given as a fraction of the current calibration.')
-    parser.add_argument('--end', type=float, default=1.1, help='End of the calibration range. Given as a fraction of the current calibration.')
-    parser.add_argument('--guess', type=float, default=None, help='Initial guess for the diffraction calibration in Å^-1 (overrides current calibration in data)')
-    parser.add_argument('-n', type=int, default=10, help='Number of calibration points to evaluate between start and end')
-    parser.add_argument('--npt', type=int, default=None, help='Number of points for radial integration. If None, defaults to half-diagonal of the pattern.')
-    parser.add_argument('--log_shift', action='store_true', help='Wether to use a log shift (with shift=1) as an intensity transformation to apply before template matching. Helps to enhance weak reflections. Default is False.')
-    parser.add_argument('--name', type=str, default='', help='Name for the output files. Output files are timestamped. If not provided, the name of the input file is used.')
-    args = parser.parse_args()
 
-    #Get the input path of the data file. Log files will be saved in the same directory.
+def main():
+    parser = argparse.ArgumentParser(
+        description="Calibration check for 4DSTEM data using template matching."
+    )
+    parser.add_argument(
+        "input_file", type=str, help="Path to the input 4DSTEM data file"
+    )
+    parser.add_argument(
+        "--template_file",
+        type=str,
+        default=None,
+        help='Path to the template file for matching. Pickle format. If not provided (default), I will look for a a file with "_template.pkl" appended to the name in same directory as 4DSTEM data file',
+    )
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        dest="verbosity",
+        default=0,
+        action="count",
+        help="Set verbose level: -v for INFO, -vv for DEBUG",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help='Directory to save output results. Default is None, which will put outputs in a subfolder "calibration_check" at the same location as input data',
+    )
+    parser.add_argument(
+        "--n_random",
+        type=int,
+        default=5,
+        help="Number of random coordinates to pick for analysis",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=197405, help="Random seed for reproducibility"
+    )
+    parser.add_argument(
+        "--lazy", action="store_true", help="Load data lazily using dask"
+    )
+    parser.add_argument(
+        "--start",
+        type=float,
+        default=0.9,
+        help="Start of the calibration range. Given as a fraction of the current calibration.",
+    )
+    parser.add_argument(
+        "--end",
+        type=float,
+        default=1.1,
+        help="End of the calibration range. Given as a fraction of the current calibration.",
+    )
+    parser.add_argument(
+        "--guess",
+        type=float,
+        default=None,
+        help="Initial guess for the diffraction calibration in Å^-1 (overrides current calibration in data)",
+    )
+    parser.add_argument(
+        "-n",
+        type=int,
+        default=10,
+        help="Number of calibration points to evaluate between start and end",
+    )
+    parser.add_argument(
+        "--npt",
+        type=int,
+        default=None,
+        help="Number of points for radial integration. If None, defaults to half-diagonal of the pattern.",
+    )
+    parser.add_argument(
+        "--log_shift",
+        action="store_true",
+        help="Wether to use a log shift (with shift=1) as an intensity transformation to apply before template matching. Helps to enhance weak reflections. Default is False.",
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        default="",
+        help="Name for the output files. Output files are timestamped. If not provided, the name of the input file is used.",
+    )
+    parser.add_argument(
+        "--show_results",
+        action="store_true",
+        help="Whether to store individual pixel results with templates overlaid",
+    )
+    parser.add_argument(
+        "--max_pixels",
+        type=int,
+        default=50,
+        help="The maximum number of pixels to show if `--show_results=True` (see above). This is to avoid outputting a huge amount of image files if run on a large selection of the data.",
+    )
+    args = parser.parse_args()
+    set_log_level(logger, args.verbosity)
+    _logger.debug(f"Logger level = {logger.level}")
+
+    # Get the input path of the data file. Log files will be saved in the same directory.
     input_path = MyPath(args.input_file)
     if len(args.name) == 0:
-        output_dir_name = f'{input_path.stem}'
+        output_dir_name = f"{input_path.stem}"
     else:
-        output_dir_name = f'{args.name}'
-    output_dir_name = f'{dt.now().strftime("%Y%m%d_%H%M%S")}_{output_dir_name}'
-    output_dir = MyPath(args.output_dir) / output_dir_name
+        output_dir_name = f"{args.name}"
+    output_dir_name = f'{dt.datetime.now().strftime("%Y%m%d_%H%M%S")}_{output_dir_name}'
+    if args.output_dir is None:
+        output_dir = (
+            input_path.absolute().parent / "calibration_check" / output_dir_name
+        )
+    else:
+        output_dir = MyPath(args.output_dir) / output_dir_name
     output_dir.mkdir(parents=True, exist_ok=True)
+    add_log_handler(output_dir / "log.txt")
 
-    #Print parser description and arguments to log
-    parser_description = 'Calibration check script arguments:'
-    parser_description_header = '*' * len(parser_description)
-    parser_description = parser_description_header + '\n' + parser_description + '\n' + parser_description_header + '\n'
-    parser_description += '\n'.join([f'{arg}: {getattr(args, arg)}' for arg in vars(args)])
-    logger.info(f'Parser description:\n{parser_description}')
+    # Print parser description and arguments to log
+    parser_description = "Calibration check script arguments:"
+    parser_description_header = "*" * len(parser_description)
+    parser_description = (
+        parser_description_header
+        + "\n"
+        + parser_description
+        + "\n"
+        + parser_description_header
+        + "\n"
+    )
+    parser_description += "\n".join(
+        [f"{arg}: {getattr(args, arg)}" for arg in vars(args)]
+    )
+    _logger.info(f"Parser description:\n{parser_description}")
 
-    #Write parser arguments to json file in output directory for record keeping
-    args_path = output_dir / 'arguments.json'
-    with open(args_path, 'w') as f:
+    # Write parser arguments to json file in output directory for record keeping
+    args_path = output_dir / "arguments.json"
+    with open(args_path, "w") as f:
         json.dump({arg: getattr(args, arg) for arg in vars(args)}, f, indent=4)
 
     # Set up paths
     if args.template_file is None:
-        template_path = input_path.append('template', 'pkl')
-        logger.debug(f'No template file provided; using default: {template_path}')
+        template_path = input_path.append("template", "pkl")
+        _logger.debug(f"No template file provided; using default: {template_path}")
     else:
         template_path = MyPath(args.template_file)
-    
 
-    #Load data
-    signal = load(input_path)    
+    # Load data
+    signal = load(input_path)
 
-    #Set initial guess for calibration if provided
+    # Set initial guess for calibration if provided
     if args.guess is not None:
         signal.set_diffraction_calibration(args.guess)
-        logger.debug(f'Setting initial guess for calibration to {args.guess:.4e}')
+        _logger.debug(f"Setting initial guess for calibration to {args.guess:.4e}")
 
-    #Load template
-    logger.info(f'Loading template from {template_path}')
+    # Load template
+    _logger.info(f"Loading template from {template_path}")
     template = load_template(template_path)
-    
-    #Pick random coordinates
-    logger.info(f'Picking {args.n_random} random coordinates from data for analysis')
-    random_signal = pick_random(signal, n=args.n_random, seed=args.seed, show=True, output_path=output_dir / 'vbf_coordinates.png')
+
+    # Pick random coordinates
+    _logger.info(f"Picking {args.n_random} random coordinates from data for analysis")
+    random_signal = pick_random(
+        signal,
+        n=args.n_random,
+        seed=args.seed,
+        show=True,
+        output_path=output_dir / "vbf_coordinates.png",
+    )
+    out_signal_path = output_dir / "selected.hspy"
+    _logger.info(f'Saving selected signal to "{out_signal_path}"')
+    random_signal.save(out_signal_path, overwrite=True)
 
     # Perform calibration check
-    logger.info('Performing calibration check...')
-    results = test_calibration(random_signal, template, start=args.start, end=args.end, n=args.n, intensity_transform_function=log_shift if args.log_shift else None, npt=args.npt)
-    logger.info('Calibration check completed.')
+    _logger.info("Performing calibration check...")
+    results = test_calibration(
+        random_signal,
+        template,
+        start=args.start,
+        end=args.end,
+        n=args.n,
+        intensity_transform_function=log_shift if args.log_shift else None,
+        npt=args.npt,
+        out_image_dir=output_dir / r"images/",
+        save_pixels=args.show_results,
+        max_pixels=args.max_pixels,
+    )
+    _logger.info("Calibration check completed.")
 
     # Save results
-    logger.info(f'Saving results to {output_dir}')
-    results_path = output_dir / f'calibration_results.csv'
-    with open(results_path, 'w', encoding='utf-8') as f:
+    _logger.info(f"Saving results to {output_dir}")
+    results_path = output_dir / f"calibration_results.csv"
+    with open(results_path, "w", encoding="utf-8") as f:
         results.to_csv(f, index=False)
-    logger.info(f'Results saved to {results_path}')
-    
+    _logger.info(f"Results saved to {results_path}")
+
     # Generate and save plot
-    logger.info('Generating calibration plot...')
+    _logger.info("Generating calibration plot...")
     plt.figure()
     try:
-        sb.lineplot(data=results, x='Calibration', y='Correlation', hue='Pixels')
+        sb.lineplot(data=results, x="Calibration", y="Correlation", hue="Pixels")
     except Exception as e:
-        logger.error(f'Failed to generate calibration plot: {e}\nGenerating plot without hue.')
-        sb.lineplot(data=results, x='Calibration', y='Correlation')
-    plt.title(f'{args.name} Calibration Check' if len(args.name) > 0 else 'Calibration Check')
+        _logger.error(
+            f"Failed to generate calibration plot: {e}\nGenerating plot without hue."
+        )
+        sb.lineplot(data=results, x="Calibration", y="Correlation")
+    plt.title(
+        f"{args.name} Calibration Check" if len(args.name) > 0 else "Calibration Check"
+    )
     plt.tight_layout()
-    plt.savefig(results_path.with_suffix('.png'), dpi=300)
-    logger.info(f'Calibration plot saved to {results_path.with_suffix(".png")}')
+    plt.savefig(results_path.with_suffix(".png"), dpi=300)
+    _logger.info(f'Calibration plot saved to {results_path.with_suffix(".png")}')
     plt.close()
 
     # Summarize results
-    summary_path = output_dir / 'calibration_summary.png'
-    summary = summarize_results(results, summary_path, title=f'{args.name} Calibration Summary' if len(args.name) > 0 else 'Calibration Summary')
-    logger.info(f'Summary plot saved to {summary_path}')
-    summary_csv_path = summary_path.with_suffix('.csv')
-    with open(summary_csv_path, 'w', encoding='utf-8') as f:
+    summary_path = output_dir / "calibration_summary.png"
+    summary = summarize_results(
+        results,
+        summary_path,
+        title=(
+            f"{args.name} Calibration Summary"
+            if len(args.name) > 0
+            else "Calibration Summary"
+        ),
+    )
+    _logger.info(f"Summary plot saved to {summary_path}")
+    summary_csv_path = summary_path.with_suffix(".csv")
+    with open(summary_csv_path, "w", encoding="utf-8") as f:
         summary.to_csv(f, index=False)
-    logger.info(f'Summary statistics saved to {summary_csv_path}')
+    _logger.info(f"Summary statistics saved to {summary_csv_path}")
 
-    logger.info('Calibration check process completed successfully.')
+    _logger.info("Calibration check process completed successfully.")
+
+    remove_log_handler(output_dir / "log.txt")
     gc.collect()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
