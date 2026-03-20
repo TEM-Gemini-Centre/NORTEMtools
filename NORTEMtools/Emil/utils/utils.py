@@ -96,6 +96,61 @@ class MyPath(Path):  # helpful for appending suffixes to filenames
             return self.with_name(f"{self.stem}{delimiter}{s}.{suffix}")
         else:
             return self.with_stem(f"{self.stem}{delimiter}{s}")
+    
+    def get_files_in_directory(self, suffix: str = ".jh5", recursive: bool = True, sort=True, show=False) -> Dict:
+        """Get all files of the specified suffix in the path, if it is a directory.
+        Args:
+            suffix (str): the file type to find. Default is ".jh5"
+            recursive (bool): Whether to search subfolders as well. Default is True.
+        """
+
+        if self.is_dir():
+            files = []
+            for path in self.iterdir():
+                if path.is_dir():
+                    files.append(
+                        path.get_files_in_directory(suffix=suffix, recursive=recursive)
+                    )
+                elif suffix is None:
+                    files.append(path)
+                elif path.suffix == suffix:
+                    files.append(path)
+                files = list(filter(None, files))
+
+            files = list(itertools.chain.from_iterable(np.asarray(b).ravel() for b in files))
+            if sort:
+                files = sorted(files)
+            
+            if show:
+                print(f'Files found in "{self.absolute()}":')
+                for i, fn in enumerate(files):
+                    print(f'{i}:\t{fn.relative_to(self)}')
+            return files
+        else:
+            _logger.error(f'Cannot list files in "{self!s}", the path is not a directory')
+            return []
+    
+    def list_files(self, suffix: Union[None, List, str] = None, recursive: bool=True, sort: bool = False, sort_chars: int = 4) -> None:
+        """Prints a list of the files in the present path if it is a directory
+
+        Args:
+            suffix (Union[None, List, str]): Only list files with the specified suffix(es)
+            recursive (bool): Whether to also list files found in subdirectories or not. Default is True.
+            sort (bool): whether to sort the results based on a set number of leading characters in the file names. Default is False.
+            sort_chars (int): how many leading characters to use for sorting the filenames.
+
+        Returns:
+            none
+        """
+
+        if self.is_dir():
+            filenames = self.get_files_in_directory(self, suffix, recursive=recursive)
+            if sort:
+                filenames.sort(key=lambda x: x.stem[:sort_chars+1]) #Sort based on first four characters.
+            for i, fn in enumerate(filenames):
+                print(f'{i}:\t{fn}')
+        else:
+            _logger.error(f'Cannot list files in "{self!s}", the path is not a directory')
 
 
 def set_log_level(logger, level: int = 0):
@@ -889,18 +944,7 @@ def get_files_in_directory(
     directory: Path, suffix: str = ".jh5", recursive: bool = True
 ) -> Dict:
     """Get all files with a given suffix in a directory."""
-    directory = MyPath(directory)
-    files = []
-    for path in directory.iterdir():
-        if path.is_dir():
-            files.append(
-                get_files_in_directory(path, suffix=suffix, recursive=recursive)
-            )
-        elif path.suffix == suffix:
-            files.append(path)
-    files = list(filter(None, files))
-    return list(itertools.chain.from_iterable(np.asarray(b).ravel() for b in files))
-    # return files
+    return MyPath(directory).get_files_in_directory(suffix=suffix, recursive=recursive)
 
 
 def move_all_axes(array: np.ndarray, n: int = 1) -> np.ndarray:
