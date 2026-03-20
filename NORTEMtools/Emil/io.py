@@ -47,9 +47,9 @@ def load_all(
     files = []
     for suffix in file_types:
         _logger.debug(f"Getting all files with suffix {suffix} in directory {path}")
-        files.extend(get_files_in_directory(path, suffix=suffix, recursive=True))
+        files.extend(path.get_files_in_directory(suffix=suffix, recursive=True))
     _logger.info(
-        f'Found {len(files)} files with specified file types in {directory}:\n\t{"\n\t".join([str(file) for file in files])}'
+        f'Found {len(files)} files with specified file types in {directory}:\n\t{"\n\t".join([str(file.relative_to(path)) for file in files])}'
     )
 
     filenames = []
