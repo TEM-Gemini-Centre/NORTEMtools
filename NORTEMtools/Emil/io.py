@@ -9,7 +9,8 @@ def load_all(
     directory: Union[str, MyPath],
     file_types: List[str] = [".jh5", ".prz"],
     save: bool = False,
-    overwrite: bool = False,
+    overwrite: bool = False, 
+    **kwargs
 ) -> Tuple[List[Signal], List[str], List[str]]:
     """
     Load all files in a directory into a dictionary.
@@ -77,7 +78,7 @@ def load_all(
                 signal_list.append(load_jh5(file))
                 filenames.append(str(file))
             else:
-                signal_list.append(load(file))
+                signal_list.append(load(file, **kwargs))
                 filenames.append(str(file))
         except Exception as e:
             _logger.error(f"Failed to load file {file}: {e}")
