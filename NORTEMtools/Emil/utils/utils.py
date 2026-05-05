@@ -19,7 +19,6 @@ import argparse
 import logging
 import itertools
 
-
 Signal = Union[pxm.signals.ElectronDiffraction2D, pxm.signals.LazyDiffraction2D]
 
 
@@ -96,8 +95,10 @@ class MyPath(Path):  # helpful for appending suffixes to filenames
             return self.with_name(f"{self.stem}{delimiter}{s}.{suffix}")
         else:
             return self.with_stem(f"{self.stem}{delimiter}{s}")
-    
-    def get_files_in_directory(self, suffix: str = ".jh5", recursive: bool = True, sort=True, show=False) -> Dict:
+
+    def get_files_in_directory(
+        self, suffix: str = ".jh5", recursive: bool = True, sort=True, show=False
+    ) -> Dict:
         """Get all files of the specified suffix in the path, if it is a directory.
         Args:
             suffix (str): the file type to find. Default is ".jh5"
@@ -117,20 +118,30 @@ class MyPath(Path):  # helpful for appending suffixes to filenames
                     files.append(path)
                 files = list(filter(None, files))
 
-            files = list(itertools.chain.from_iterable(np.asarray(b).ravel() for b in files))
+            files = list(
+                itertools.chain.from_iterable(np.asarray(b).ravel() for b in files)
+            )
             if sort:
                 files = sorted(files)
-            
+
             if show:
                 print(f'Files found in "{self.absolute()}":')
                 for i, fn in enumerate(files):
-                    print(f'{i}:\t{fn.relative_to(self)}')
+                    print(f"{i}:\t{fn.relative_to(self)}")
             return files
         else:
-            _logger.error(f'Cannot list files in "{self!s}", the path is not a directory')
+            _logger.error(
+                f'Cannot list files in "{self!s}", the path is not a directory'
+            )
             return []
-    
-    def list_files(self, suffix: Union[None, List, str] = None, recursive: bool=True, sort: bool = False, sort_chars: int = 4) -> None:
+
+    def list_files(
+        self,
+        suffix: Union[None, List, str] = None,
+        recursive: bool = True,
+        sort: bool = False,
+        sort_chars: int = 4,
+    ) -> None:
         """Prints a list of the files in the present path if it is a directory
 
         Args:
@@ -146,11 +157,15 @@ class MyPath(Path):  # helpful for appending suffixes to filenames
         if self.is_dir():
             filenames = self.get_files_in_directory(self, suffix, recursive=recursive)
             if sort:
-                filenames.sort(key=lambda x: x.stem[:sort_chars+1]) #Sort based on first four characters.
+                filenames.sort(
+                    key=lambda x: x.stem[: sort_chars + 1]
+                )  # Sort based on first four characters.
             for i, fn in enumerate(filenames):
-                print(f'{i}:\t{fn}')
+                print(f"{i}:\t{fn}")
         else:
-            _logger.error(f'Cannot list files in "{self!s}", the path is not a directory')
+            _logger.error(
+                f'Cannot list files in "{self!s}", the path is not a directory'
+            )
 
 
 def set_log_level(logger, level: int = 0):
@@ -509,7 +524,7 @@ def pick_random(
     #    assert s == signal.inav[c].data, f'Data at coordinate {c} is not equal to the corresponding data in the selection'
 
     # NB The length of coords must be an even number for the code below to work.
-    new_shape = (2, -1, 256, 256)
+    new_shape = (2, -1) + signal.axes_manager.signal_shape
     _logger.debug(f"Reshaping selected signals to shape {new_shape}")
     selection = np.reshape(selection, new_shape)
     _logger.debug(f"Reshaped signal has shape {selection.shape}")
@@ -830,7 +845,10 @@ def center_direct_beam(
         shifts = signal.get_direct_beam_position(method="center_of_mass", mask=com_mask)
         try:
             shifts.compute()
-        except Exception:
+        except Exception as e:
+            _logger.debug(
+                f"Could not compute shifts due to error {e}. Continuing without halting execution"
+            )
             pass
         kwargs["shifts"] = shifts
         _logger.debug(f"Found direct beam positions {shifts}")
