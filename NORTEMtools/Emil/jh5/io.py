@@ -77,7 +77,11 @@ class JH5Reader:
     which are typically used in scientific data applications.
     """
 
-    _signal_type_mapping = {"EdsSpectrum": "EDS_TEM", "EelsCube": "EELS"}
+    _signal_type_mapping = {
+        "EdsSpectrum": "EDS_TEM",
+        "EdsCube": "EDS_TEM",
+        "EelsCube": "EELS",
+    }
     _units_mapping = {"Nanometer": "nm", "KeV": "keV"}
 
     def __init__(self, filepath: Union[str, Path]):
@@ -737,3 +741,69 @@ def load_JEOL_worksheet(file_path: _emutils.MyPath) -> Dict:
     )
     _logger.info(f"Loaded files\n{table}")
     return signals
+
+
+def load_JEOL_EDS(file_path: _emutils.MyPath) -> hs.signals.Signal1D:
+    """Load JEOL EDS spectrum from .jh5 file."""
+    file_path = _emutils.MyPath(file_path)
+    reader = JH5Reader(file_path)
+    s = jh5_to_hspy(reader, "0")
+    s.metadata.General.title = "Summed signal"
+
+    spectrum_imaging_directory = (
+        file_path.parent / file_path.stem / "WL" / "SpectralImaging"
+    )
+    if spectrum_imaging_directory.exists():
+        _logger.info(
+            f"Found spectral imaging directory {spectrum_imaging_directory} for EDS spectrum {file_path}. Loading spectrum imaging files."
+        )
+        spectrum_imaging_files = list(spectrum_imaging_directory.glob("*.hdf5"))
+        if len(spectrum_imaging_files) > 0:
+            _logger.info(
+                f"Found {len(spectrum_imaging_files)} spectral imaging files in {spectrum_imaging_directory}. Loading them as hyperspy signals and reconstrucing dataset."
+            )
+            signal_parts = []
+            for file in spectrum_imaging_files:
+                try:
+                    signal_parts.append(load_eds_part(file))
+                except Exception as e:
+                    _logger.error(
+                        f"Could not read spectral imaging file {file} with .jh5 filereader due to error {e}"
+                    )
+            if len(signal_parts) > 0:
+                signal = np.concatenate(signal_parts, axis=0)
+                signal = hs.signals.Signal1D(signal)  #
+                signal.original_metadata.add_dictionary(s.metadata.as_dictionary())
+                signal.metadata.add_dictionary(s.metadata.as_dictionary())
+                signal.metadata.add_dictionary({"JH5": {"jh5_file": s}})
+                signal.set_signal_type("EDS_TEM")
+
+                for i in range(2):
+                    signal.axes_manager[i].scale = s.axes_manager[i].scale
+                    signal.axes_manager[i].offset = s.axes_manager[i].offset
+                    signal.axes_manager[i].units = s.axes_manager[i].units
+                    signal.axes_manager[i].name = s.axes_manager[i].name
+
+                signal.metadata.set_item("General.title", f"{reader.filepath.stem}")
+                return signal
+            else:
+                _logger.warning(
+                    f"No Signal parts found in {spectrum_imaging_directory} for EDS spectrum {file_path}. This probably means that the spectral imaging data was not saved/exported from FEMTUS correctly"
+                )
+        else:
+            _logger.warning(
+                f"Could not find any spectral imaging files in {spectrum_imaging_directory} for EDS spectrum {file_path}. This probably means that the spectral imaging data was not saved/exported from FEMTUS correctly"
+            )
+
+    else:
+        _logger.warning(
+            f"Could not find spectral imaging directory {spectrum_imaging_directory} for EDS spectrum {file_path}. This probably means that the spectral imaging data was not saved/exported from FEMTUS correctly"
+        )
+
+
+def load_eds_part(file_path: _emutils.MyPath) -> hs.signals.Signal1D:
+    """Load EDS part of a .jh5 file as a hyperspy signal."""
+    file_path = _emutils.MyPath(file_path)
+    file = h5py.File(file_path, "r")
+    s = np.array(file["DefaultDataset"])
+    return s
