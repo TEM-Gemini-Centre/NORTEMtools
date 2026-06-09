@@ -9,7 +9,8 @@ def load_all(
     directory: Union[str, MyPath],
     file_types: List[str] = [".jh5", ".prz"],
     save: bool = False,
-    overwrite: bool = False,
+    overwrite: bool = False, 
+    **kwargs
 ) -> Tuple[List[Signal], List[str], List[str]]:
     """
     Load all files in a directory into a dictionary.
@@ -47,9 +48,9 @@ def load_all(
     files = []
     for suffix in file_types:
         _logger.debug(f"Getting all files with suffix {suffix} in directory {path}")
-        files.extend(get_files_in_directory(path, suffix=suffix, recursive=True))
+        files.extend(path.get_files_in_directory(suffix=suffix, recursive=True))
     _logger.info(
-        f'Found {len(files)} files with specified file types in {directory}:\n\t{"\n\t".join([str(file) for file in files])}'
+        f'Found {len(files)} files with specified file types in {directory}:\n\t{"\n\t".join([str(file.relative_to(path)) for file in files])}'
     )
 
     filenames = []
@@ -77,7 +78,7 @@ def load_all(
                 signal_list.append(load_jh5(file))
                 filenames.append(str(file))
             else:
-                signal_list.append(load(file))
+                signal_list.append(load(file, **kwargs))
                 filenames.append(str(file))
         except Exception as e:
             _logger.error(f"Failed to load file {file}: {e}")
